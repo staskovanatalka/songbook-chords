@@ -1,1 +1,133 @@
-/* You can add global styles to this file, and also import other style files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PŮVODNÍ PROMĚNNÉ */
+:root {
+  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --primary-color: #1a73e8;
+  --primary-color-alpha: rgba(26, 115, 232, 0.15);
+
+  --bg-body: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f3f4;
+  --bg-input: #ffffff;
+
+  --text-main: #202124;
+  --text-muted: #5f6368;
+
+  --border-color: #dadce0;
+}
+
+.dark {
+  --bg-body: #121212;
+  --bg-card: #1e1e1e;
+  --bg-hover: #303134;
+  --bg-input: #2d2d2d;
+
+  --text-main: #e8eaed;
+  --text-muted: #9aa0a6;
+
+  --border-color: #3c4043;
+}
+
+body {
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+}
+
+/* SPRÁVNÉ POZICOVÁNÍ AKORDŮ NAD TEXTEM */
+pre#song-content {
+  font-family: var(--font-mono) !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 2.3;
+}
+
+.word-with-chord {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: bottom;
+}
+
+.chord-word-wrapper {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.chord {
+  font-family: var(--font-mono) !important;
+  font-size: 0.82em;
+  font-weight: 700;
+  color: var(--primary-color) !important;
+  line-height: 1.2;
+}
+
+/* OBSIDIAN STYLE SEZNAM PRO SIDEBAR */
+.sidebar-item-active {
+  background-color: var(--primary-color-alpha) !important;
+  color: var(--primary-color) !important;
+  font-weight: 600;
+}
+/* Container pro sledování šířky karty písničky */
+.toolbar-container {
+  container-type: inline-size;
+  container-name: toolbar;
+}
+
+/* Výchozí stav (malé okno / otevřený sidebar): Tóniny skryté, kompaktní číslo viditelné */
+.scale-picker-full {
+  display: none;
+}
+.scale-picker-compact {
+  display: flex;
+}
+
+/* Pokud má karta víc než 560px: Rozbalí se tóniny a skryje kompaktní číslo */
+@container toolbar (min-width: 560px) {
+  .scale-picker-full {
+    display: flex !important;
+  }
+  .scale-picker-compact {
+    display: none !important;
+  }
+}
+
+/* ========================================================= */
+/* CSS STYLY PRO TISK (@media print)                          */
+/* ========================================================= */
+@media print {
+  /* Skryje veškerý balast aplikace (hlavičku, sidebar, tlačítka, menu) */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Zobrazí pouze kartu písničky a její obsah */
+  .printable-song-card,
+  .printable-song-card * {
+    visibility: visible !important;
+  }
+
+  /* Umístí písničku čistě na začátek papíru bez rámečků a stínů */
+  .printable-song-card {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Zamezí zbytečnému rozdělení slova nebo akordu napůl přes stránky */
+  pre#song-content {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+  }
+}
