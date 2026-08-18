@@ -3,11 +3,11 @@ import { CommonModule } from '@angular/common';
 import { SongService } from './core/services/song.service';
 import { HeaderComponent } from './shared/components/header.component';
 import { SidebarComponent } from './features/converter/sidebar.component';
-import { SongDetailComponent } from './shared/components/song-detail.component';
 import { SongConverterComponent, NewSongData } from './shared/components/song-converter.component';
 import { Song } from './core/models/song.model';
 import { TunerComponent } from './shared/components/tuner.component';
 import { AuthService } from './core/services/auth.service';
+import {SongDetailComponent} from './features/converter/song-detail.component';
 
 @Component({
   selector: 'app-root',
