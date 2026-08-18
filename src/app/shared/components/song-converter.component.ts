@@ -1,7 +1,7 @@
-import {Component, effect, HostListener, input, output, signal} from '@angular/core';
+import { Component, effect, HostListener, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import {Song} from '../../core/models/song.model';
+import { Song } from '../../core/models/song.model';
 
 export interface NewSongData {
   title: string;
@@ -10,6 +10,7 @@ export interface NewSongData {
   strumming?: string;
   notes?: string;
   text: string;
+  tags?: string[];
 }
 
 @Component({
@@ -129,6 +130,9 @@ export class SongConverterComponent {
   notes = signal<string>('');
   rawText = signal<string>('');
 
+  newTagInput = signal<string>('');
+  currentTags = signal<string[]>([]);
+
   saveSong = output<NewSongData>();
   cancel = output<void>();
 
@@ -142,8 +146,9 @@ export class SongConverterComponent {
         this.capo.set(song.capo || '');
         this.strumming.set(song.strumming || '');
         this.notes.set(song.notes || '');
-        // Pokud máš zkonvertovaný text s [C], pro úpravu ho stačí vložit do textarea
         this.rawText.set(song.text || '');
+        // OPRAVA: Načtení tagů správně přes funkci song.tags
+        this.currentTags.set(song.tags ? [...song.tags] : []);
       } else {
         this.resetForm();
       }
@@ -154,6 +159,18 @@ export class SongConverterComponent {
   @HostListener('window:keydown.escape')
   handleKeyboardEvent() {
     this.cancel.emit();
+  }
+
+  addTag() {
+    const val = this.newTagInput().trim().toLowerCase().replace(/^#/, '');
+    if (val && !this.currentTags().includes(val)) {
+      this.currentTags.update(tags => [...tags, val]);
+      this.newTagInput.set('');
+    }
+  }
+
+  removeTag(tagToRemove: string) {
+    this.currentTags.update(tags => tags.filter(t => t !== tagToRemove));
   }
 
   handleConvertAndSave() {
@@ -167,7 +184,8 @@ export class SongConverterComponent {
       capo: this.capo().trim(),
       strumming: this.strumming().trim(),
       notes: this.notes().trim(),
-      text: convertedText
+      text: convertedText,
+      tags: this.currentTags() // OPRAVA: Posíláme nastavené tagy při uložení
     });
 
     this.resetForm();
@@ -180,9 +198,10 @@ export class SongConverterComponent {
     this.strumming.set('');
     this.notes.set('');
     this.rawText.set('');
+    this.currentTags.set([]);
+    this.newTagInput.set('');
   }
 
-  // Původní algoritmus pro parsování akordových řádků
   private convertRawText(raw: string): string {
     const lines = raw.split("\n");
     const resultLines: string[] = [];
@@ -193,48 +212,55 @@ export class SongConverterComponent {
       if (this.isChordLine(currentLine)) {
         const nextLine = lines[i + 1] || "";
 
-        // 1. PŘÍPAD: Samostatný akordový řádek
-        if (nextLine.trim() === "" || this.isChordLine(nextLine)) {
-          let chordOnlyLine = currentLine.replace(/([A-H][A-Za-z0-9#\+\-\/]*)(,?)/g, (match, chord, comma) => {
-            return `[${chord}]${comma || ''}`;
-          });
-
-          resultLines.push(`{${chordOnlyLine}}`);
+        // 1. Samostatný akordový řádek / předehra (bez textu pod ním)
+        if (!nextLine.trim() || this.isChordLine(nextLine)) {
+          const chordRegex = /\b[A-H](?:b|#)?(?:m|maj|mi|ma|dim|aug|add|sus)?\d*(?:\/[A-H](?:b|#)?)?\b/g;
+          const formattedLine = currentLine.replace(chordRegex, (match) => `[${match}]`);
+          resultLines.push(`{${formattedLine}}`);
           continue;
         }
 
-        // 2. PŘÍPAD: Akordy nad textem
-        const prefixMatch = nextLine.match(/^(\s*(?:\d+\.|\w+\:|[A-Z]\.)\s*)/);
+        // 2. Proplétání do textu
+        const prefixMatch = nextLine.match(/^(\s*(?:\d+\.|\w+\:|[A-Z]\.|R\:|Ref\:)\s*)/i);
         const prefix = prefixMatch ? prefixMatch[1] : "";
         const cleanNextLine = nextLine.slice(prefix.length);
 
-        interface TempChord { chord: string; index: number; }
-        const chords: TempChord[] = [];
+        interface TokenMatch { text: string; index: number; isChord: boolean; }
+        const tokens: TokenMatch[] = [];
 
-        const regex = /([A-H][A-Za-z0-9#\+\-\/]*)/g;
+        // Regex zachytí akordy I symboly |, :|, 4x
+        const tokenRegex = /(\b[A-H](?:b|#)?(?:m|maj|mi|ma|dim|aug|add|sus)?\d*(?:\/[A-H](?:b|#)?)?\b)|(\||:\||\|:|\b\d+x\b)/gi;
+
         let match: RegExpExecArray | null;
-        while ((match = regex.exec(currentLine)) !== null) {
-          chords.push({
-            chord: match[1],
-            index: match.index
+        while ((match = tokenRegex.exec(currentLine)) !== null) {
+          tokens.push({
+            text: match[0],
+            index: Math.max(0, match.index - prefix.length),
+            isChord: !!match[1]
           });
         }
 
         let textWithChords = prefix;
         let textIndex = 0;
 
-        chords.forEach(c => {
-          if (c.index > textIndex) {
-            textWithChords += cleanNextLine.substring(textIndex, c.index);
-            textIndex = c.index;
+        tokens.forEach(t => {
+          if (t.index > textIndex) {
+            textWithChords += cleanNextLine.substring(textIndex, t.index);
+            textIndex = t.index;
           }
 
-          while (textIndex < cleanNextLine.length && /[\s,.\-!?]/.test(cleanNextLine[textIndex])) {
-            textWithChords += cleanNextLine[textIndex];
-            textIndex++;
+          if (t.isChord) {
+            // Posun k prvním písmenu slova dole
+            while (textIndex < cleanNextLine.length && /[\s,.\-!?]/.test(cleanNextLine[textIndex])) {
+              textWithChords += cleanNextLine[textIndex];
+              textIndex++;
+            }
+            textWithChords += `[${t.text.trim()}]`;
+          } else {
+            // OPRAVA: Symboly ořízneme na max. 1 mezeru, aby nevnikaly obří díry {|        ||}
+            const cleanSymbol = t.text.trim();
+            textWithChords += `{|${cleanSymbol}|}`;
           }
-
-          textWithChords += `[${c.chord}]`;
         });
 
         if (textIndex < cleanNextLine.length) {
@@ -242,7 +268,7 @@ export class SongConverterComponent {
         }
 
         resultLines.push(textWithChords);
-        i++; // Přeskočíme textový řádek
+        i++;
       } else {
         resultLines.push(currentLine);
       }
@@ -250,6 +276,9 @@ export class SongConverterComponent {
 
     return resultLines.join("\n");
   }
+
+
+
 
   private isChordLine(line: string): boolean {
     const chordRegex = /^[A-H1-9#m\s\+\-\/dimsu,|x|:\(\)]+(\s*\d+x)?$/i;

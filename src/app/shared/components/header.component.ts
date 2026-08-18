@@ -1,18 +1,17 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, inject, output, signal, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ThemeService } from '../../core/services/theme.service';
 import { MetronomeService } from '../../core/services/metronome.service';
-import { TunerService } from '../../core/services/tuner.service';
 import { SongService } from '../../core/services/song.service';
-import { Instrument } from '../../core/models/song.model';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-header',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <header class="w-full px-4 border-b border-[var(--border-color)] mb-3 py-2 bg-[var(--bg-card)]">
+    <header class="w-full px-4 border-b border-[var(--border-color)] py-2 bg-[var(--bg-card)]">
       <div class="flex justify-between items-center gap-2">
 
         <!-- VLEVO: Tlačítka Sidebar a Přidat -->
@@ -44,9 +43,21 @@ import { Instrument } from '../../core/models/song.model';
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
+
+          <!-- LADIČKA -->
+          <button
+            type="button"
+            class="h-8 px-2 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+            title="Otevřít ladičku"
+            (click)="openTuner.emit()"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </button>
         </div>
 
-        <!-- VPRAVO: Nástroje, Metronom, Akcent a Téma -->
+        <!-- VPRAVO: Nástroje, Téma a Profilové Menu -->
         <div class="flex items-center gap-2 shrink-0">
 
           <!-- Výběr barvy -->
@@ -72,81 +83,20 @@ import { Instrument } from '../../core/models/song.model';
             >
           </div>
 
-          <!-- METRONOM -->
-          <div class="flex items-center gap-1">
-            <div class="flex items-center h-8 rounded overflow-hidden border bg-[var(--bg-card)] border-[var(--border-color)]">
-              <button
-                type="button"
-                class="h-full px-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] font-mono text-sm cursor-pointer"
-                (click)="metronomeService.setBpm(-5)"
-                title="Zpomalit (-5 BPM)"
-              >–</button>
-
-              <div class="flex items-center justify-center px-2 h-full min-w-[68px] border-x border-[var(--border-color)] font-mono">
-                <span class="font-bold text-xs mr-1 text-[var(--text-main)]">{{ metronomeService.bpm() }}</span>
-                <span class="text-[10px] text-[var(--text-muted)] opacity-75">BPM</span>
-                <div
-                  class="w-1.5 h-1.5 rounded-full ml-1.5 transition-opacity"
-                  [style.background-color]="metronomeService.isPlaying() ? 'var(--primary-color, #2563eb)' : '#aaa'"
-                  [style.opacity]="metronomeService.isPlaying() ? '1' : '0.4'"
-                ></div>
-              </div>
-
-              <button
-                type="button"
-                class="h-full px-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] font-mono text-sm cursor-pointer"
-                (click)="metronomeService.setBpm(5)"
-                title="Zrychlit (+5 BPM)"
-              >+</button>
-            </div>
-
-            <!-- Start / Stop Metronom -->
-            <button
-              type="button"
-              class="h-8 w-8 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-              (click)="metronomeService.toggle()"
-              title="Spustit/Zastavit metronom"
-            >
-              @if (!metronomeService.isPlaying()) {
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--primary-color, #2563eb)" stroke="var(--primary-color, #2563eb)" stroke-width="2">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-              } @else {
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="#dc3545" stroke="#dc3545" stroke-width="2">
-                  <rect x="4" y="4" width="16" height="16" rx="2"></rect>
-                </svg>
-              }
-            </button>
-          </div>
-
-          <!-- LADIČKA -->
+          <!-- Tlačítko Nástroj -->
           <button
             type="button"
-            class="h-8 px-2 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-            title="Otevřít ladičku"
-            (click)="openTuner.emit()"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </button>
-
-          <!-- NÁSTROJ -->
-          <button
-            type="button"
-            class="h-8 px-2 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] font-mono font-bold text-xs transition-colors cursor-pointer"
-            title="Změnit nástroj"
             (click)="songService.toggleInstrument()"
+            class="h-8 px-2.5 rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] text-xs font-mono font-medium hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
           >
             {{ songService.currentInstrument() }}
           </button>
 
-          <!-- NOTACE -->
+          <!-- Tlačítko Notace -->
           <button
             type="button"
-            class="h-8 px-2 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] font-mono font-bold text-xs transition-colors cursor-pointer"
-            title="Změnit notaci akordů"
             (click)="songService.toggleNotation()"
+            class="h-8 px-2.5 rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] text-xs font-mono font-medium hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
           >
             {{ songService.currentNotation() }}
           </button>
@@ -160,10 +110,6 @@ import { Instrument } from '../../core/models/song.model';
           >
             @if (themeService.theme() === 'light') {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-              </svg>
-            } @else {
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="5"></circle>
                 <line x1="12" y1="1" x2="12" y2="3"></line>
                 <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -174,9 +120,87 @@ import { Instrument } from '../../core/models/song.model';
                 <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
               </svg>
+            } @else {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
             }
           </button>
 
+          <!-- PROFILOVÉ TLAČÍTKO S DROPDOWN MENU -->
+          @if (authService.currentUser(); as user) {
+            <div class="relative pl-2 border-l border-[var(--border-color)] flex items-center">
+
+              <!-- Kulaté tlačítko s fotkou -->
+              <button
+                type="button"
+                (click)="toggleUserMenu($event)"
+                class="w-8 h-8 rounded-full border border-[var(--border-color)] overflow-hidden flex items-center justify-center bg-[var(--bg-card)] hover:ring-2 hover:ring-[var(--primary-color)] transition-all cursor-pointer p-0 shrink-0 select-none"
+                title="{{ user.displayName || user.email }}"
+              >
+                @if (user.photoURL) {
+                  <img
+                    [src]="user.photoURL"
+                    [alt]="user.displayName || 'Profil'"
+                    referrerpolicy="no-referrer"
+                    class="w-8 h-8 min-w-[32px] min-h-[32px] max-w-[32px] max-h-[32px] object-cover rounded-full"
+                  />
+                } @else {
+                  <div class="w-full h-full bg-[var(--primary-color-alpha)] text-[var(--primary-color)] flex items-center justify-center text-xs font-bold font-mono">
+                    {{ user.displayName?.charAt(0) || user.email?.charAt(0) || 'U' }}
+                  </div>
+                }
+              </button>
+
+              <!-- Rozbalovací nabídka (Dropdown) -->
+              @if (isUserMenuOpen()) {
+                <div class="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl p-3 z-[100] font-sans">
+
+                  <!-- Hlavička uživatele -->
+                  <div class="flex items-center gap-3 pb-3 border-b border-[var(--border-color)]">
+                    @if (user.photoURL) {
+                      <img
+                        [src]="user.photoURL"
+                        referrerpolicy="no-referrer"
+                        class="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full object-cover border border-[var(--border-color)] shrink-0"
+                      />
+                    } @else {
+                      <div class="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[var(--primary-color-alpha)] text-[var(--primary-color)] flex items-center justify-center text-sm font-bold font-mono shrink-0">
+                        {{ user.displayName?.charAt(0) || user.email?.charAt(0) || 'U' }}
+                      </div>
+                    }
+
+                    <div class="min-w-0 flex-1 text-left">
+                      <p class="text-xs font-bold text-[var(--text-main)] truncate leading-tight">
+                        {{ user.displayName || 'Uživatel' }}
+                      </p>
+                      <p class="text-[11px] text-[var(--text-muted)] truncate font-mono mt-0.5 leading-tight">
+                        {{ user.email }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Tlačítko odhlášení -->
+                  <div class="pt-2">
+                    <button
+                      type="button"
+                      (click)="handleLogout()"
+                      class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-xl text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                      </svg>
+                      <span>Odhlásit se</span>
+                    </button>
+                  </div>
+
+                </div>
+              }
+
+            </div>
+          }
         </div>
       </div>
     </header>
@@ -185,10 +209,29 @@ import { Instrument } from '../../core/models/song.model';
 export class HeaderComponent {
   themeService: ThemeService = inject(ThemeService);
   metronomeService: MetronomeService = inject(MetronomeService);
-  tunerService: TunerService = inject(TunerService);
   songService: SongService = inject(SongService);
+  authService: AuthService = inject(AuthService);
+  private elementRef = inject(ElementRef);
 
   openConverter = output<void>();
   openTuner = output<void>();
 
+  isUserMenuOpen = signal<boolean>(false);
+
+  toggleUserMenu(event: MouseEvent) {
+    event.stopPropagation();
+    this.isUserMenuOpen.update(v => !v);
+  }
+
+  handleLogout() {
+    this.isUserMenuOpen.set(false);
+    this.authService.logout();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    if (!this.elementRef.nativeElement.contains(event.target)) {
+      this.isUserMenuOpen.set(false);
+    }
+  }
 }

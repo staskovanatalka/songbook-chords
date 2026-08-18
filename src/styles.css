@@ -36,17 +36,52 @@
 body {
   background-color: var(--bg-body);
   color: var(--text-main);
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), sans-serif;
 }
 
-/* SPRÁVNÉ POZICOVÁNÍ AKORDŮ NAD TEXTEM */
-pre#song-content {
-  font-family: var(--font-mono) !important;
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 2.3;
+
+.symbol-above {
+  font-family: var(--font-mono), monospace !important;
+  color: var(--text-main) !important; /* Klasická barva textu místo fialové */
+  font-weight: 400;                   /* Obyčejné nepříčné písmo */
+  font-size: inherit !important;     /* 1:1 velikost s běžným textem */
+  line-height: 1.2;
 }
 
+/* Textový řádek */
+.text-line {
+  color: var(--text-main);
+  margin-bottom: 0.1rem;
+}
+
+/* Samotný akord */
+.chord {
+  font-family: var(--font-mono), monospace !important;
+  font-weight: 700;
+  color: var(--primary-color) !important;
+  font-size: inherit !important;
+}
+
+/* ========================================================= */
+/* ÚPRAVA ZOBRAZENÍ TEXTU A DVOUSLOUPCOVÉHO ROZVRŽENÍ         */
+/* ========================================================= */
+
+/* Hlavní obal textu písně (nahrazuje původní pre#song-content) */
+#song-content {
+  font-family: var(--font-mono), monospace !important;
+  line-height: 1.4 !important;
+  word-break: normal;
+}
+
+/* Sloka se NIKDY nerozdělí napůl mezi dva sloupce */
+.verse-block {
+  break-inside: avoid-column !important;
+  -webkit-column-break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  display: block;
+}
+
+/* Pojistka pro slovo + akord nad ním: drží vždy pohromadě */
 .word-with-chord {
   position: relative;
   display: inline-flex;
@@ -54,17 +89,10 @@ pre#song-content {
   vertical-align: bottom;
 }
 
+/* Obal pro zachování mezer a zamezení předčasného zalamování */
 .chord-word-wrapper {
   display: inline-block;
-  white-space: nowrap;
-}
-
-.chord {
-  font-family: var(--font-mono) !important;
-  font-size: 0.82em;
-  font-weight: 700;
-  color: var(--primary-color) !important;
-  line-height: 1.2;
+  white-space: pre;
 }
 
 /* OBSIDIAN STYLE SEZNAM PRO SIDEBAR */
@@ -73,22 +101,30 @@ pre#song-content {
   color: var(--primary-color) !important;
   font-weight: 600;
 }
-/* Container pro sledování šířky karty písničky */
+/* Zajištění, že každý verš leží na samostatném řádku a neslévá se s dalším */
+.line-wrapper {
+  display: block;
+  width: 100%;
+  white-space: pre-wrap;
+  word-break: normal;
+}
+
+/* CONTAINER QUERY PRO LIŠTU TRANSPOZICE */
 .toolbar-container {
   container-type: inline-size;
   container-name: toolbar;
 }
 
-/* Výchozí stav (malé okno / otevřený sidebar): Tóniny skryté, kompaktní číslo viditelné */
+/* Výchozí stav (málo místa / zapnutý metronom): Tóniny skryté, kompaktní číselník viditelný */
 .scale-picker-full {
-  display: none;
+  display: none !important;
 }
 .scale-picker-compact {
-  display: flex;
+  display: flex !important;
 }
 
-/* Pokud má karta víc než 560px: Rozbalí se tóniny a skryje kompaktní číslo */
-@container toolbar (min-width: 560px) {
+/* Pokud má lišta volný prostor alespoň 680px, zobrazí se plná řada tónin */
+@container toolbar (min-width: 680px) {
   .scale-picker-full {
     display: flex !important;
   }
@@ -101,18 +137,15 @@ pre#song-content {
 /* CSS STYLY PRO TISK (@media print)                          */
 /* ========================================================= */
 @media print {
-  /* Skryje veškerý balast aplikace (hlavičku, sidebar, tlačítka, menu) */
   body * {
     visibility: hidden !important;
   }
 
-  /* Zobrazí pouze kartu písničky a její obsah */
   .printable-song-card,
   .printable-song-card * {
     visibility: visible !important;
   }
 
-  /* Umístí písničku čistě na začátek papíru bez rámečků a stínů */
   .printable-song-card {
     position: absolute !important;
     left: 0 !important;
@@ -125,9 +158,85 @@ pre#song-content {
     background: transparent !important;
   }
 
-  /* Zamezí zbytečnému rozdělení slova nebo akordu napůl přes stránky */
   pre#song-content {
     break-inside: avoid;
     -webkit-column-break-inside: avoid;
   }
+}
+
+/* ========================================================= */
+/* SJEDNOCENÍ BAREV PRVKŮ V HLAVNÍ LIŠTĚ                     */
+/* ========================================================= */
+header button,
+.song-toolbar button {
+  color: var(--text-muted) !important;
+}
+
+header button svg,
+.song-toolbar button svg {
+  stroke: currentColor;
+  color: var(--text-muted) !important;
+  opacity: 1 !important;
+}
+
+header button svg.text-emerald-500,
+header button svg.text-rose-500,
+header button .text-primary {
+  color: inherit;
+  stroke: inherit;
+}
+
+/* ========================================================= */
+/* SJEDNOCENÍ VELIKOSTÍ TLAČÍTEK V HORNÍ HLAVIČCE (32px)     */
+/* ========================================================= */
+header button {
+  height: 32px !important;
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+header button.icon-btn,
+header button:has(svg:only-child) {
+  width: 32px !important;
+  min-width: 32px !important;
+  padding: 0 !important;
+}
+
+header button:not(:has(svg:only-child)) {
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+/* ========================================================= */
+/* PRECIZNÍ SJEDNOCENÍ SPODNÍ HUDEBNÍ LIŠTY NA 28px          */
+/* ========================================================= */
+.song-toolbar button,
+.scale-picker-compact button,
+.scale-picker-full button {
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.song-toolbar button.icon-btn,
+.song-toolbar button:has(svg:only-child) {
+  width: 28px !important;
+  min-width: 28px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.song-toolbar button:not(:has(svg:only-child)) {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
 }

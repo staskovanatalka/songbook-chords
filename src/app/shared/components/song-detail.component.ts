@@ -1,12 +1,23 @@
-import { Component, input, signal, computed, inject, output, HostListener } from '@angular/core';
+import {
+  Component,
+  input,
+  signal,
+  computed,
+  inject,
+  output,
+  HostListener,
+  ElementRef,
+  effect,
+  viewChild
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ChordDiagramComponent } from './chord-diagram.component';
 import { Song } from '../../core/models/song.model';
 import { SongService } from '../../core/services/song.service';
+import { MetronomeService } from '../../core/services/metronome.service';
 import html2pdf from 'html2pdf.js';
 import { StrummingPatternComponent } from './strumming-pattern.component';
-
 
 interface HoveredChord {
   name: string;
@@ -45,55 +56,152 @@ interface HoveredChord {
         <!-- LOKÁLNÍ HUDEBNÍ LIŠTA -->
         <div class="flex items-center justify-between mb-2 gap-2 px-1 flex-nowrap w-full min-w-0 overflow-visible">
 
-          <!-- KONTROLER TRANSPOZICE -->
-          <div class="inline-flex rounded border border-[var(--primary-color)] font-mono text-xs shadow-sm shrink-0">
+          <!-- LEVÁ ČÁST: PŘEPÍNÁ SE MEZI TRANSPOZICÍ A INLINE METRONOMEM -->
+          @if (!isMetronomeBarOpen()) {
 
-            <!-- Tlačítko -1 -->
-            <button
-              type="button"
-              (click)="transpose(-1)"
-              class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer rounded-l shrink-0"
-            >-1</button>
+            <!-- 1. KONTROLER TRANSPOZICE -->
+            <div class="inline-flex rounded border border-[var(--primary-color)] font-mono text-xs shadow-sm shrink-0">
 
-            <!-- 12 TLAČÍTEK TÓNIN (Řízeno čistě přes CSS @container) -->
-            <div class="scale-picker-full items-center bg-[var(--bg-card)] shrink-0">
-              @for (note of scaleNotes(); track note; let i = $index) {
+              <!-- Tlačítko -1 -->
+              <button
+                type="button"
+                (click)="transpose(-1)"
+                class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer rounded-l shrink-0"
+              >-1</button>
+
+              <!-- 12 TLAČÍTEK TÓNIN -->
+              <div class="scale-picker-full items-center bg-[var(--bg-card)] shrink-0">
+                @for (note of scaleNotes(); track note; let i = $index) {
+                  <button
+                    type="button"
+                    (click)="selectKeyIndex(i)"
+                    [class.bg-[var(--primary-color)]]="i === currentNoteIndex()"
+                    [class.text-white]="i === currentNoteIndex()"
+                    [class.text-[var(--primary-color)]]="i !== currentNoteIndex()"
+                    class="px-2 py-1 hover:bg-[var(--primary-color-alpha)] transition-colors text-center font-bold cursor-pointer border-l border-[var(--primary-color)] opacity-90 hover:opacity-100 shrink-0"
+                  >{{ note }}</button>
+                }
+              </div>
+
+              <!-- Kompaktní číselník transpozice -->
+              <div class="scale-picker-compact items-center px-3 font-bold bg-[var(--bg-card)] text-[var(--primary-color)] border-l border-[var(--primary-color)] shrink-0">
+                {{ transposeOffset() > 0 ? '+' + transposeOffset() : transposeOffset() }}
+              </div>
+
+              <!-- Tlačítko +1 -->
+              <button
+                type="button"
+                (click)="transpose(1)"
+                class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer border-l border-[var(--primary-color)] rounded-r shrink-0"
+              >+1</button>
+            </div>
+
+          } @else {
+
+            <!-- 2. INLINE OVLÁDÁNÍ METRONOMU -->
+            <div class="inline-flex items-center gap-1.5 h-[31px]">
+
+              <div class="inline-flex items-center h-[31px] rounded border border-[var(--primary-color)] bg-[var(--bg-card)] font-mono text-xs overflow-hidden shadow-sm">
                 <button
                   type="button"
-                  (click)="selectKeyIndex(i)"
-                  [class.bg-[var(--primary-color)]]="i === currentNoteIndex()"
-                  [class.text-white]="i === currentNoteIndex()"
-                  [class.text-[var(--primary-color)]]="i !== currentNoteIndex()"
-                  class="px-2 py-1 hover:bg-[var(--primary-color-alpha)] transition-colors text-center font-bold cursor-pointer border-l border-[var(--primary-color)] opacity-90 hover:opacity-100 shrink-0"
-                >{{ note }}</button>
-              }
+                  (click)="metronomeService.setBpm(-5)"
+                  class="h-full px-2 text-[var(--primary-color)] hover:bg-[var(--primary-color-alpha)] font-bold cursor-pointer"
+                  title="Zpomalit (-5 BPM)"
+                >–</button>
+
+                <div class="px-2.5 h-full flex items-center justify-center font-bold text-[var(--primary-color)] border-x border-[var(--primary-color)] bg-[var(--primary-color-alpha)] min-w-[70px]">
+                  {{ metronomeService.bpm() }} <span class="text-[10px] ml-1 opacity-75 font-normal">BPM</span>
+                </div>
+
+                <button
+                  type="button"
+                  (click)="metronomeService.setBpm(5)"
+                  class="h-full px-2 text-[var(--primary-color)] hover:bg-[var(--primary-color-alpha)] font-bold cursor-pointer"
+                  title="Zrychlit (+5 BPM)"
+                >+</button>
+              </div>
+
+              <button
+                type="button"
+                (click)="metronomeService.toggle()"
+                [class.bg-emerald-600]="metronomeService.isPlaying()"
+                [class.bg-[var(--primary-color)]]="!metronomeService.isPlaying()"
+                class="h-[31px] px-3 rounded text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              >
+                @if (metronomeService.isPlaying()) {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16"/>
+                    <rect x="14" y="4" width="4" height="16"/>
+                  </svg>
+                  <span>STOP</span>
+                } @else {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  <span>START</span>
+                }
+              </button>
+
             </div>
 
-            <!-- Kompaktní číselník transpozice -->
-            <div class="scale-picker-compact items-center px-3 font-bold bg-[var(--bg-card)] text-[var(--primary-color)] border-l border-[var(--primary-color)] shrink-0">
-              {{ transposeOffset() > 0 ? '+' + transposeOffset() : transposeOffset() }}
-            </div>
+          }
 
-            <!-- Tlačítko +1 -->
+          <!-- PRAVÁ SKUPINA TLAČÍTEK (Metronom, FIT, Sloupce, Písmo, 3 tečky) -->
+          <div class="flex items-center gap-1.5 ml-auto font-mono shrink-0 relative">
+
+            <!-- Tlačítko pro zapnutí / vypnutí metronomu -->
             <button
               type="button"
-              (click)="transpose(1)"
-              class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer border-l border-[var(--primary-color)] rounded-r shrink-0"
-            >+1</button>
-          </div>
+              (click)="isMetronomeBarOpen.set(!isMetronomeBarOpen())"
+              [class.bg-[var(--primary-color-alpha)]]="isMetronomeBarOpen()"
+              [class.text-[var(--primary-color)]]="isMetronomeBarOpen()"
+              [class.border-[var(--primary-color)]]="isMetronomeBarOpen()"
+              class="h-[31px] w-8 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+              title="Metronom"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </button>
 
-          <!-- Ovládání písma a sloupců (Pravá skupina tlačítek) -->
-          <div class="flex items-center gap-1.5 ml-auto font-mono shrink-0 relative">
+            <!-- TLAČÍTKO FIT -->
+            <button
+              type="button"
+              (click)="toggleAutoFit()"
+              [class.bg-[var(--primary-color-alpha)]]="isAutoFitEnabled()"
+              [class.text-[var(--primary-color)]]="isAutoFitEnabled()"
+              [class.border-[var(--primary-color)]]="isAutoFitEnabled()"
+              class="h-[31px] px-2 flex items-center justify-center gap-1 rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors text-xs font-bold cursor-pointer"
+              title="Automaticky přizpůsobit velikost textu na obrazovku"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 14 10 14 10 20"></polyline>
+                <polyline points="20 10 14 10 14 4"></polyline>
+                <line x1="14" y1="10" x2="21" y2="3"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+              <span>Fit</span>
+            </button>
+
+            <!-- Jemný oddělovač -->
+            <div class="h-4 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
+
+            <!-- Tlačítko sloupce -->
             <button
               type="button"
               (click)="toggleTwoColumns()"
-              [class.bg-[var(--bg-hover)]]="isTwoColumns()"
+              [class.bg-[var(--primary-color-alpha)]]="isTwoColumns()"
+              [class.text-[var(--primary-color)]]="isTwoColumns()"
+              [class.border-[var(--primary-color)]]="isTwoColumns()"
               class="h-[31px] px-2 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
               title="Přepnout sloupce"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                <line x1="12" y1="3" x2="12" y2="21"></line>
+                @if (isTwoColumns()) {
+                  <line x1="12" y1="3" x2="12" y2="21"></line>
+                }
               </svg>
             </button>
 
@@ -110,7 +218,7 @@ interface HoveredChord {
             >A+</button>
 
             <!-- TLAČÍTKO SE TŘEMI TECKAMI & DROPDOWN -->
-            <div class="relative song-menu-container z-[100]">
+            <div class="relative song-menu-container z-30">
               <button
                 type="button"
                 (click)="toggleMenu($event)"
@@ -124,11 +232,8 @@ interface HoveredChord {
                 </svg>
               </button>
 
-              <!-- ROZEVÍRACÍ MENU -->
               @if (isMenuOpen()) {
                 <div class="absolute right-0 top-full mt-1 w-44 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-2xl py-1 z-[9999] text-xs font-sans">
-
-                  <!-- UPRAVIT -->
                   <button
                     type="button"
                     (click)="onEdit()"
@@ -141,7 +246,6 @@ interface HoveredChord {
                     Upravit písničku
                   </button>
 
-                  <!-- TISK -->
                   <button
                     type="button"
                     (click)="onPrint()"
@@ -157,7 +261,6 @@ interface HoveredChord {
 
                   <div class="my-1 border-t border-[var(--border-color)]"></div>
 
-                  <!-- SMAZAT -->
                   <button
                     type="button"
                     (click)="onDelete()"
@@ -169,7 +272,6 @@ interface HoveredChord {
                     </svg>
                     Smazat písničku
                   </button>
-
                 </div>
               }
             </div>
@@ -178,7 +280,10 @@ interface HoveredChord {
         </div>
 
         <!-- KARTA PÍSNIČKY -->
-        <div class="printable-song-card bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 mb-4 shadow-sm">
+        <div
+          #songCard
+          class="printable-song-card bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 mb-4 shadow-sm"
+        >
           <!-- HLAVIČKA -->
           <div class="flex justify-between items-center pb-2 mb-2 border-b border-[var(--border-color)] flex-wrap gap-2">
             <h2 class="text-xl md:text-2xl font-bold m-0 text-[var(--text-main)]">
@@ -206,7 +311,6 @@ interface HoveredChord {
                 <span class="text-[var(--text-muted)] opacity-75">Rytmus:</span>
                 <strong class="text-[var(--primary-color)]">{{ currentSong.strumming }}</strong>
 
-                <!-- POPUP SE ŠIPKAMI RYTMU -->
                 @if (isStrummingHovered()) {
                   <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[9999] pointer-events-none">
                     <app-strumming-pattern [pattern]="currentSong.strumming"></app-strumming-pattern>
@@ -217,14 +321,14 @@ interface HoveredChord {
           </div>
 
           <!-- TEXT S AKORDY -->
-          <pre
+          <div
             id="song-content"
-            class="my-3 text-[var(--text-main)]"
-            [class.columns-2]="isTwoColumns()"
-            [class.gap-10]="isTwoColumns()"
+            class="my-3 text-[var(--text-main)] font-mono transition-all duration-150"
+            [style.columnCount]="isTwoColumns() ? 2 : 1"
+            [style.columnGap]="isTwoColumns() ? '2.5rem' : '0'"
             [style.fontSize.px]="fontSize()"
             [innerHTML]="parsedSongHtml()"
-          ></pre>
+          ></div>
 
           <!-- AUTOMATICKÝ PŘEHLED AKORDŮ POD PÍSNIČKOU -->
           @if (uniqueChords().length > 0) {
@@ -234,8 +338,12 @@ interface HoveredChord {
               </h3>
               <div class="flex flex-wrap gap-4 items-center">
                 @for (chordName of uniqueChords(); track chordName) {
-                  <div class="flex flex-col items-center bg-[var(--bg-body)] p-2 rounded border border-[var(--border-color)] shadow-sm print:shadow-none print:border-none">
-                    <app-chord-diagram [chordName]="chordName"></app-chord-diagram>
+                  <div class="flex flex-col items-center p-2">
+                    <app-chord-diagram
+                      [chordName]="chordName"
+                      [hasBorder]="false"
+                      [scale]="1.3"
+                    ></app-chord-diagram>
                   </div>
                 }
               </div>
@@ -263,13 +371,19 @@ interface HoveredChord {
 export class SongDetailComponent {
   sanitizer = inject(DomSanitizer);
   songService = inject(SongService);
+  metronomeService = inject(MetronomeService);
+
+  songCardEl = viewChild<ElementRef>('songCard');
+
+  isMetronomeBarOpen = signal<boolean>(false);
+  isAutoFitEnabled = signal<boolean>(true);
 
   song = input<Song | null>(null);
   notation = input<'CZ' | 'EN'>('CZ');
   instrument = input<'GTR' | 'UKU'>('GTR');
 
   transposeOffset = signal<number>(0);
-  fontSize = signal<number>(18);
+  fontSize = signal<number>(14);
   isTwoColumns = signal<boolean>(false);
   isStrummingHovered = signal<boolean>(false);
 
@@ -286,15 +400,23 @@ export class SongDetailComponent {
 
   isMenuOpen = signal<boolean>(false);
 
-  // Události pro rodičovskou komponentu
   editSong = output<void>();
   printSong = output<void>();
   deleteSong = output<void>();
 
+  constructor() {
+    effect(() => {
+      const current = this.song();
+      if (current && this.isAutoFitEnabled()) {
+        setTimeout(() => this.calculateAutoFit(), 60);
+      }
+    });
+  }
+
   scaleNotes = computed(() => {
     return this.notation() === 'CZ' ? this.scaleCZ : this.scaleEN;
   });
-  // Dynamicky vybere všechny unikátní akordy použité v aktuální písničce
+
   uniqueChords = computed<string[]>(() => {
     const currentSong = this.song();
     if (!currentSong || !currentSong.text) return [];
@@ -341,6 +463,60 @@ export class SongDetailComponent {
     return this.sanitizer.bypassSecurityTrustHtml(rawHtml);
   });
 
+  @HostListener('window:resize')
+  onResize() {
+    if (this.isAutoFitEnabled()) {
+      this.calculateAutoFit();
+    }
+  }
+
+  toggleAutoFit() {
+    this.isAutoFitEnabled.update(v => !v);
+    if (this.isAutoFitEnabled()) {
+      this.calculateAutoFit();
+    }
+  }
+
+  calculateAutoFit() {
+    const currentSong = this.song();
+    if (!currentSong) return;
+
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    // Spočítáme počet slok
+    const verses = currentSong.text.trim().split(/\n\s*\n/);
+    const verseCount = verses.length;
+
+    // 1. Priorita 2 sloupců: pokud je obrazovka široká a píseň má víc než 2 sloky
+    const shouldUseTwoColumns = windowWidth >= 768 && verseCount >= 3;
+    this.isTwoColumns.set(shouldUseTwoColumns);
+
+    // 2. Nastavíme výchozí čitelný font
+    let targetFont = shouldUseTwoColumns ? 14 : 15;
+    this.fontSize.set(targetFont);
+
+    // 3. Změříme reálnou výšku až po vykreslení v DOMu
+    requestAnimationFrame(() => {
+      const cardEl = this.songCardEl()?.nativeElement as HTMLElement;
+      if (!cardEl) return;
+
+      const cardRect = cardEl.getBoundingClientRect();
+      const availableHeight = Math.max(windowHeight - cardRect.top - 30, 200);
+
+      // Pokud i ve 2 sloupcích (nebo 1) přesahuje, zmenšujeme font
+      const shrinkInterval = () => {
+        if (cardEl.scrollHeight > availableHeight && targetFont > 10) {
+          targetFont -= 0.5;
+          this.fontSize.set(targetFont);
+          requestAnimationFrame(shrinkInterval);
+        }
+      };
+
+      requestAnimationFrame(shrinkInterval);
+    });
+  }
+
   transpose(amount: number) {
     this.transposeOffset.update(v => v + amount);
   }
@@ -353,10 +529,12 @@ export class SongDetailComponent {
   }
 
   changeFontSize(amount: number) {
-    this.fontSize.update(s => Math.min(Math.max(s + amount, 12), 28));
+    this.isAutoFitEnabled.set(false);
+    this.fontSize.update(s => Math.min(Math.max(s + amount, 10), 28));
   }
 
   toggleTwoColumns() {
+    this.isAutoFitEnabled.set(false);
     this.isTwoColumns.update(v => !v);
   }
 
@@ -407,30 +585,26 @@ export class SongDetailComponent {
     const current = this.song();
     if (!current) return;
 
-    // 1. Najdeme element karty písničky
     const element = document.querySelector('.printable-song-card') as HTMLElement;
     if (!element) return;
 
-    // 2. Připravíme název souboru: NazevPisnicky_Autor.pdf (očistíme od mezer a diakritiky)
     const formatName = (str: string) =>
       str
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Odstraní diakritiku
-        .replace(/\s+/g, '_')           // Nahradí mezery podtržítkem
-        .replace(/[^a-zA-Z0-9_]/g, '');  // Odstraní speciální znaky
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_]/g, '');
 
     const fileName = `${formatName(current.title)}_${formatName(current.artist)}.pdf`;
 
-    // 3. Konfigurace generování PDF
     const options = {
       margin: 10,
       filename: fileName,
-      image: { type: 'jpeg' as const, quality: 0.98 }, // <- Přidáno 'as const'
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
 
-    // 4. Vygenerujeme a stáhneme PDF
     html2pdf().set(options).from(element).save();
 
     this.printSong.emit();
@@ -470,34 +644,44 @@ export class SongDetailComponent {
 
     const processedVerses = rawVerses.map(verse => {
       const lines = verse.split('\n');
+
       const processedLines = lines.map(line => {
 
         if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
           const innerContent = line.trim().slice(1, -1);
-          const replaced = innerContent.replace(/\[(.*?)\]|([A-H][A-Za-z0-9#\+\-\/]*)/g, (match, inBrackets, standalone) => {
-            const chord = inBrackets || standalone;
-            if (!chord) return match;
+
+          const renderedLine = innerContent.replace(/\[(.*?)\]/g, (_, chord: string) => {
             const transposed = this.transposeChord(chord, semitones, notation);
-            return `<span class="chord font-bold text-[var(--primary-color)] cursor-pointer hover:underline">${transposed}</span>`;
+            return `<span class="chord font-bold cursor-pointer hover:underline">${transposed}</span>`;
           });
-          return `<div class="font-mono my-1">${replaced}</div>`;
+
+          return `<div class="line-wrapper chord-line font-mono select-none">${renderedLine}</div>`;
         }
 
-        return line.replace(/(\S*\[.*?\]\S*)/g, (fullWord) => {
-          const processedWord = fullWord.replace(/\[(.*?)\]([A-Za-zá-žÁ-Ž0-9#b\+\-,]*)/g, (_, chord: string, subWord: string) => {
-            const transposed = this.transposeChord(chord, semitones, notation);
-            const safeWord = subWord || "";
-            return `<span class="word-with-chord"><span class="chord cursor-pointer hover:underline">${transposed}</span>${safeWord}</span>`;
+        const renderedLine = line.replace(/(\S*(?:\[.*?\]|\{\|.*?\|\})\S*)/g, (fullWord) => {
+          const processedWord = fullWord.replace(/(?:\[(.*?)\]|\{\|(.*?)\|\})([^\s\[\{]*)/g, (_, chord: string, symbol: string, subWord: string) => {
+            const safeWord = subWord.length > 0 ? subWord : "&nbsp;";
+
+            if (chord) {
+              const transposed = this.transposeChord(chord, semitones, notation);
+              return `<span class="word-with-chord"><span class="chord cursor-pointer hover:underline">${transposed}</span>${safeWord}</span>`;
+            } else if (symbol) {
+              return `<span class="word-with-chord"><span class="symbol-above text-[var(--text-main)] font-normal">${symbol}</span>${safeWord}</span>`;
+            }
+
+            return subWord;
           });
 
           return `<span class="chord-word-wrapper">${processedWord}</span>`;
         });
+
+        return `<div class="line-wrapper text-line font-mono">${renderedLine || '&nbsp;'}</div>`;
       });
 
-      return `<div class="mb-4">${processedLines.join('\n')}</div>`;
+      return `<div class="verse-block mb-4 block w-full" style="break-inside: avoid; page-break-inside: avoid;">${processedLines.join('')}</div>`;
     });
 
-    return processedVerses.join('\n');
+    return processedVerses.join('');
   }
 
   private transposeChord(chord: string, semitones: number, notation: 'CZ' | 'EN'): string {

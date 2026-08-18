@@ -11,12 +11,21 @@ import { SongService } from '../../core/services/song.service';
   imports: [CommonModule],
   template: `
     <div
-      class="inline-block p-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded shadow-lg select-none"
+      class="inline-block p-1 select-none transition-all origin-top"
+      [style.transform]="'scale(' + scale() + ')'"
+      [class.bg-[var(--bg-card)]]="hasBorder()"
+      [class.border]="hasBorder()"
+      [class.border-[var(--border-color)]]="hasBorder()"
+      [class.rounded]="hasBorder()"
+      [class.shadow-lg]="hasBorder()"
       [innerHTML]="svgContent()"
     ></div>
   `
 })
 export class ChordDiagramComponent {
+
+  scale = input<number>(1);
+  hasBorder = input<boolean>(true);
   sanitizer = inject(DomSanitizer);
   songService = inject(SongService);
 
@@ -109,7 +118,7 @@ export class ChordDiagramComponent {
     const startX = ((width - fretboardWidth) / 2) + 3;
     const startY = 30;
 
-    let svgHtml = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="background: transparent; font-family: var(--font-mono, monospace); color: var(--text-main);">`;
+    let svgHtml = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="background: transparent; font-family: var(--font-mono, monospace),serif; color: var(--text-main);">`;
 
     // 1. Název akordu nahoře
     svgHtml += `<text x="${width / 2}" y="15" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--primary-color)">${name}</text>`;
