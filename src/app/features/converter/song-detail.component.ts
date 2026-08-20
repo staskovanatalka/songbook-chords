@@ -34,6 +34,9 @@ interface HoveredChord {
         class="w-full relative overflow-visible toolbar-container"
         [class.p-4]="songService.isFullscreen()"
         [class.md:p-8]="songService.isFullscreen()"
+        [class.h-screen]="songService.isFullscreen()"
+        [class.flex]="songService.isFullscreen()"
+        [class.flex-col]="songService.isFullscreen()"
         (mouseover)="onContentHover($event)"
         (mouseout)="onContentMouseOut($event)"
       >
@@ -52,12 +55,12 @@ interface HoveredChord {
           </div>
         }
 
-        <!-- PŘI FULLSCREENU: Tlačítko pro návrat v rohu -->
+        <!-- PŘI FULLSCREENU: Tlačítko pro návrat v pravém dolním rohu -->
         @if (songService.isFullscreen()) {
           <button
             type="button"
             (click)="toggleFullscreen()"
-            class="fixed top-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer shadow-md text-xs font-mono select-none"
+            class="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer shadow-lg text-xs font-mono select-none opacity-80 hover:opacity-100"
             title="Ukončit režim celé obrazovky (Esc)"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -67,7 +70,7 @@ interface HoveredChord {
           </button>
         }
 
-        <!-- BĚŽNÁ HUDEBNÍ LIŠTA (Při fullscreenu je skrytá) -->
+        <!-- BĚŽNÁ HUDEBNÍ LIŠTA -->
         @if (!songService.isFullscreen()) {
           <div class="flex items-center justify-between mb-2 gap-2 px-1 flex-nowrap w-full min-w-0 overflow-visible">
 
@@ -117,25 +120,6 @@ interface HoveredChord {
                   <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                 </svg>
               </button>
-
-              <!-- TLAČÍTKO FIT -->
-              <button
-                type="button"
-                (click)="toggleAutoFit()"
-                class="btn-text"
-                [class.btn-active]="isAutoFitEnabled()"
-                title="Automaticky přizpůsobit velikost textu na obrazovku"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="4 14 10 14 10 20"></polyline>
-                  <polyline points="20 10 14 10 14 4"></polyline>
-                  <line x1="14" y1="10" x2="21" y2="3"></line>
-                  <line x1="3" y1="21" x2="10" y2="14"></line>
-                </svg>
-                <span>Fit</span>
-              </button>
-
-              <div class="h-4 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
 
               <!-- Tlačítko sloupce -->
               <button
@@ -234,7 +218,7 @@ interface HoveredChord {
         <!-- SAMOTNÁ KARTA S PÍSNIČKOU -->
         <div
           #songCard
-          class="printable-song-card transition-all duration-150"
+          class="printable-song-card transition-all duration-150 flex-1 flex flex-col"
           [class.bg-[var(--bg-card)]]="!songService.isFullscreen()"
           [class.border]="!songService.isFullscreen()"
           [class.border-[var(--border-color)]]="!songService.isFullscreen()"
@@ -247,7 +231,7 @@ interface HoveredChord {
           [class.bg-transparent]="songService.isFullscreen()"
         >
           <!-- HLAVIČKA -->
-          <div class="flex justify-between items-center pb-2 mb-2 border-b border-[var(--border-color)] flex-wrap gap-2">
+          <div class="flex justify-between items-center pb-2 mb-2 border-b border-[var(--border-color)] flex-wrap gap-2 shrink-0">
             <h2 class="text-xl md:text-2xl font-bold m-0 text-[var(--text-main)]">
               {{ currentSong.title }}
             </h2>
@@ -257,35 +241,37 @@ interface HoveredChord {
           </div>
 
           <!-- METADATA -->
-          <div class="flex gap-4 items-center mb-4 font-mono text-xs">
-            @if (currentSong.capo) {
-              <span class="inline-flex items-center gap-1">
-                <span class="text-[var(--text-muted)] opacity-75">Capo:</span>
-                <strong class="text-[var(--primary-color)]">{{ currentSong.capo }}</strong>
-              </span>
-            }
-            @if (currentSong.strumming) {
-              <div
-                class="relative inline-flex items-center gap-1 cursor-help"
-                (mouseenter)="isStrummingHovered.set(true)"
-                (mouseleave)="isStrummingHovered.set(false)"
-              >
-                <span class="text-[var(--text-muted)] opacity-75">Rytmus:</span>
-                <strong class="text-[var(--primary-color)]">{{ currentSong.strumming }}</strong>
+          @if (currentSong.capo || currentSong.strumming) {
+            <div class="flex gap-4 items-center mb-3 font-mono text-xs shrink-0">
+              @if (currentSong.capo) {
+                <span class="inline-flex items-center gap-1">
+                  <span class="text-[var(--text-muted)] opacity-75">Capo:</span>
+                  <strong class="text-[var(--primary-color)]">{{ currentSong.capo }}</strong>
+                </span>
+              }
+              @if (currentSong.strumming) {
+                <div
+                  class="relative inline-flex items-center gap-1 cursor-help"
+                  (mouseenter)="isStrummingHovered.set(true)"
+                  (mouseleave)="isStrummingHovered.set(false)"
+                >
+                  <span class="text-[var(--text-muted)] opacity-75">Rytmus:</span>
+                  <strong class="text-[var(--primary-color)]">{{ currentSong.strumming }}</strong>
 
-                @if (isStrummingHovered()) {
-                  <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[9999] pointer-events-none">
-                    <app-strumming-pattern [pattern]="currentSong.strumming"></app-strumming-pattern>
-                  </div>
-                }
-              </div>
-            }
-          </div>
+                  @if (isStrummingHovered()) {
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[9999] pointer-events-none">
+                      <app-strumming-pattern [pattern]="currentSong.strumming"></app-strumming-pattern>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
 
           <!-- TEXT S AKORDY -->
           <div
             id="song-content"
-            class="my-3 text-[var(--text-main)] font-mono transition-all duration-150"
+            class="my-1 text-[var(--text-main)] font-mono transition-all duration-100 flex-1"
             [style.columnCount]="isTwoColumns() ? 2 : 1"
             [style.columnGap]="isTwoColumns() ? '2.5rem' : '0'"
             [style.fontSize.px]="fontSize()"
@@ -294,17 +280,17 @@ interface HoveredChord {
 
           <!-- AUTOMATICKÝ PŘEHLED AKORDŮ POD PÍSNIČKOU -->
           @if (uniqueChords().length > 0) {
-            <div class="border-t border-[var(--border-color)] pt-4 mt-6 print:pt-2 print:mt-3">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3 font-mono">
+            <div class="border-t border-[var(--border-color)] pt-3 mt-3 shrink-0 print:pt-2 print:mt-2">
+              <h3 class="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2 font-mono">
                 Použité akordy ({{ uniqueChords().length }})
               </h3>
-              <div class="flex flex-wrap gap-4 items-center">
+              <div class="flex flex-wrap gap-3 items-center">
                 @for (chordName of uniqueChords(); track chordName) {
-                  <div class="flex flex-col items-center p-2">
+                  <div class="flex flex-col items-center">
                     <app-chord-diagram
                       [chordName]="chordName"
                       [hasBorder]="false"
-                      [scale]="1.3"
+                      [scale]="1.15"
                     ></app-chord-diagram>
                   </div>
                 }
@@ -313,8 +299,8 @@ interface HoveredChord {
           }
 
           <!-- POZNÁMKY -->
-          @if (currentSong.notes) {
-            <div class="border-t border-[var(--border-color)] pt-3 mt-4">
+          @if (currentSong.notes && !songService.isFullscreen()) {
+            <div class="border-t border-[var(--border-color)] pt-3 mt-3 shrink-0">
               <h6 class="uppercase text-[var(--text-muted)] text-[10px] font-bold tracking-wider mb-1">Moje Poznámky</h6>
               <div class="italic text-sm text-[var(--text-muted)]">{{ currentSong.notes }}</div>
             </div>
@@ -335,8 +321,6 @@ export class SongDetailComponent {
   songService = inject(SongService);
 
   songCardEl = viewChild<ElementRef>('songCard');
-
-  isAutoFitEnabled = signal<boolean>(true);
 
   song = input<Song | null>(null);
   notation = input<'CZ' | 'EN'>('CZ');
@@ -366,8 +350,8 @@ export class SongDetailComponent {
   constructor() {
     effect(() => {
       const current = this.song();
-      if (current && this.isAutoFitEnabled()) {
-        setTimeout(() => this.calculateAutoFit(), 60);
+      if (current) {
+        setTimeout(() => this.autoFitText(), 60);
       }
     });
   }
@@ -424,9 +408,7 @@ export class SongDetailComponent {
 
   @HostListener('window:resize')
   onResize() {
-    if (this.isAutoFitEnabled()) {
-      this.calculateAutoFit();
-    }
+    this.autoFitText();
   }
 
   @HostListener('window:keydown.escape')
@@ -439,18 +421,11 @@ export class SongDetailComponent {
   toggleFullscreen() {
     this.songService.toggleFullscreen();
     setTimeout(() => {
-      this.calculateAutoFit();
+      this.autoFitText();
     }, 100);
   }
 
-  toggleAutoFit() {
-    this.isAutoFitEnabled.update(v => !v);
-    if (this.isAutoFitEnabled()) {
-      this.calculateAutoFit();
-    }
-  }
-
-  calculateAutoFit() {
+  autoFitText() {
     const cardEl = this.songCardEl()?.nativeElement as HTMLElement;
     const currentSong = this.song();
     if (!cardEl || !currentSong) return;
@@ -461,19 +436,21 @@ export class SongDetailComponent {
     const verses = currentSong.text.trim().split(/\n\s*\n/);
     const verseCount = verses.length;
 
-    const canFitTwoCols = cardWidth >= 650 && verseCount >= 3;
+    const canFitTwoCols = cardWidth >= 620 && verseCount >= 2;
     this.isTwoColumns.set(canFitTwoCols);
 
-    let currentFont = canFitTwoCols ? 15 : 16;
+    let currentFont = this.songService.isFullscreen()
+      ? (canFitTwoCols ? 14 : 15)
+      : (canFitTwoCols ? 13.5 : 14.5);
     this.fontSize.set(currentFont);
 
     requestAnimationFrame(() => {
       const cardRect = cardEl.getBoundingClientRect();
-      const availableHeight = Math.max(windowHeight - cardRect.top - 20, 200);
+      const availableHeight = Math.max(windowHeight - cardRect.top - 24, 200);
 
       const adjust = () => {
-        if (cardEl.scrollHeight > availableHeight && currentFont > 10) {
-          currentFont -= 0.5;
+        if (cardEl.scrollHeight > availableHeight && currentFont > 8.5) {
+          currentFont -= 0.4;
           this.fontSize.set(currentFont);
           requestAnimationFrame(adjust);
         }
@@ -495,12 +472,10 @@ export class SongDetailComponent {
   }
 
   changeFontSize(amount: number) {
-    this.isAutoFitEnabled.set(false);
-    this.fontSize.update(s => Math.min(Math.max(s + amount, 10), 28));
+    this.fontSize.update(s => Math.min(Math.max(s + amount, 8), 28));
   }
 
   toggleTwoColumns() {
-    this.isAutoFitEnabled.set(false);
     this.isTwoColumns.update(v => !v);
   }
 
@@ -602,9 +577,16 @@ export class SongDetailComponent {
   }
 
   private renderSongText(text: string, semitones: number, notation: 'CZ' | 'EN'): string {
-    const rawVerses = text.split(/\n\s*\n/);
+    // Normalizace: pokud je za samostatným "R:" hned číslo sloky (např. "3."), oddělíme je prázdným řádkem
+    const normalizedText = text.replace(/(^[ \t]*(?:R\d*:|Ref\.:|Ref:|Refrén:|Chorus:)[ \t]*)\n([ \t]*\d+\.)/gim, '$1\n\n$2');
+    const rawVerses = normalizedText.split(/\n\s*\n/);
 
     const processedVerses = rawVerses.map(verse => {
+      const trimmedVerse = verse.trim();
+
+      // Detekce refrénu (i samotného R:)
+      const isChorus = /^(R\d*:|Ref\.:|Ref:|Refrén:|Chorus:)/i.test(trimmedVerse) && !/^\s*\d+\./m.test(trimmedVerse);
+
       const lines = verse.split('\n');
 
       const processedLines = lines.map(line => {
@@ -640,7 +622,14 @@ export class SongDetailComponent {
         return `<div class="line-wrapper text-line font-mono whitespace-nowrap">${renderedLine || '&nbsp;'}</div>`;
       });
 
-      return `<div class="verse-block mb-4 block w-full" style="break-inside: avoid; page-break-inside: avoid;">${processedLines.join('')}</div>`;
+// Prodloužená zaoblená čárka s minimální výškou
+      const chorusIndicator = isChorus
+        ? '<div class="absolute left-0 top-0 bottom-0 min-h-[1.5em] w-[3px] rounded-full bg-[var(--primary-color)] opacity-50 pointer-events-none"></div>'
+        : '';
+
+      const paddingClass = isChorus ? 'pl-3.5' : '';
+
+      return `<div class="verse-block relative mb-3 block w-full ${paddingClass}" style="break-inside: avoid-column; -webkit-column-break-inside: avoid; page-break-inside: avoid; display: inline-block;">${chorusIndicator}${processedLines.join('')}</div>`;
     });
 
     return processedVerses.join('');
