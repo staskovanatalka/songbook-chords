@@ -23,13 +23,9 @@ import { SongDetailComponent } from './features/converter/song-detail.component'
   template: `
     @if (authService.currentUser()) {
       <!-- HLAVNÍ APLIKACE PRO PŘIHLÁŠENÉHO UŽIVATELE -->
-      <div
-        class="h-screen w-screen flex flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-main)] touch-pan-y"
-        (touchstart)="onTouchStart($event)"
-        (touchend)="onTouchEnd($event)"
-      >
+      <div class="h-screen w-screen flex flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-main)]">
 
-        <!-- HORNÍ LIŠTA (Skryje se při Fullscreenu) -->
+        <!-- HORNÍ LIŠTA -->
         @if (!songService.isFullscreen()) {
           <app-header
             (openConverter)="openNewSongConverter()"
@@ -48,7 +44,7 @@ import { SongDetailComponent } from './features/converter/song-detail.component'
         <!-- HLAVNÍ PLOCHA POD HLAVIČKOU -->
         <div class="flex flex-1 min-h-0 w-full overflow-hidden relative">
 
-          <!-- BOČNÍ PANEL SE SEZNAMEM (Skryje se při Fullscreenu) -->
+          <!-- BOČNÍ PANEL SE SEZNAMEM -->
           @if (!songService.isFullscreen()) {
             <app-sidebar></app-sidebar>
           }
@@ -175,28 +171,29 @@ export class AppComponent {
     }
   }
 
-  onTouchStart(event: TouchEvent) {
-    this.touchStartX = event.changedTouches[0].screenX;
-    this.touchStartY = event.changedTouches[0].screenY;
+  @HostListener('window:touchstart', ['$event'])
+  onWindowTouchStart(event: TouchEvent) {
+    this.touchStartX = event.touches[0].clientX;
+    this.touchStartY = event.touches[0].clientY;
   }
 
-  onTouchEnd(event: TouchEvent) {
+  @HostListener('window:touchend', ['$event'])
+  onWindowTouchEnd(event: TouchEvent) {
+    // Gesta fungují pouze při prohlížení detailu písně (ne v editoru/převodníku)
     if (this.activeView() !== 'detail') return;
 
-    const touchEndX = event.changedTouches[0].screenX;
-    const touchEndY = event.changedTouches[0].screenY;
+    const touchEndX = event.changedTouches[0].clientX;
+    const touchEndY = event.changedTouches[0].clientY;
 
     const diffX = touchEndX - this.touchStartX;
     const diffY = touchEndY - this.touchStartY;
 
-    // Minimální délka gesta 50px a ověření, že šlo o horizontální tah
-    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+    // Podmínka: tah delší než 40 px a horizontální pohyb výraznější než vertikální rolování
+    if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.2) {
       if (diffX < 0) {
-        // Swipe doleva -> Další písnička
-        this.navigateNext();
+        this.navigateNext(); // Swipe doleva -> Další písnička
       } else {
-        // Swipe doprava -> Předchozí písnička
-        this.navigatePrev();
+        this.navigatePrev(); // Swipe doprava -> Předchozí písnička
       }
     }
   }
