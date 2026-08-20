@@ -23,6 +23,9 @@ export class SongService {
   songs = signal<Song[]>([]);
   activeSong = signal<Song | null>(null);
   isLoading = signal<boolean>(false);
+// Přidej do SongService:
+  isFullscreen = signal<boolean>(false);
+
 
   // Záložka: 'my-songs' (Můj zpěvník) | 'all-songs' (Veřejný katalog)
   activeTab = signal<'my-songs' | 'all-songs'>('my-songs');
@@ -261,6 +264,10 @@ export class SongService {
     this.activeSong.set(song);
   }
 
+  toggleFullscreen() {
+    this.isFullscreen.update(v => !v);
+  }
+
   async addSong(newSong: Omit<Song, 'id'>) {
     try {
       const uid = this.authService.getUserId();
@@ -283,6 +290,14 @@ export class SongService {
       throw error;
     }
   }
+  setInstrument(instrument: 'GTR' | 'UKU') {
+    this.currentInstrument.set(instrument);
+  }
+
+  setNotation(notation: 'CZ' | 'EN') {
+    this.currentNotation.set(notation);
+  }
+
 
   async updateSong(param1: string | Song, param2?: Partial<Song>) {
     let id: string | undefined;

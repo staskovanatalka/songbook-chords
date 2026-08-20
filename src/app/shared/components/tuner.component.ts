@@ -1,6 +1,16 @@
-import { Component, input, output, signal, effect, OnDestroy, ElementRef, ViewChild } from '@angular/core';
+import { Component, input, output, signal, effect, OnDestroy, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Instrument } from '../../core/models/song.model';
+
+export interface StringConfig {
+  key: string;
+  displayNote: string;
+  subscript?: string;
+  y: number;
+  btnX: number;
+  pegX: number;
+  headX: number;
+}
 
 const STRUNG_FREQUENCIES: { [key: string]: number } = {
   // Kytara
@@ -22,111 +32,247 @@ const STRUNG_FREQUENCIES: { [key: string]: number } = {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div class="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-md p-6 relative flex flex-col items-center">
+    <!-- BACKDROP -->
+    <div
+      class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs font-sans animate-fade-in"
+      (click)="onBackdropClick($event)"
+    >
+      <!-- MODAL KARTA -->
+      <div class="bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-color)] rounded-3xl w-full max-w-[360px] shadow-2xl overflow-hidden text-center flex flex-col select-none">
 
-        <!-- ZAVÍRACÍ TLAČÍTKO -->
-        <button
-          type="button"
-          (click)="close.emit()"
-          class="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-main)] text-xl font-bold p-1 cursor-pointer"
-        >✕</button>
+        <!-- HORNÍ HLAVIČKA -->
+        <div class="flex items-center justify-between px-5 pt-4 pb-2 border-b border-[var(--border-color)]">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">
+              {{ instrument() === 'UKU' ? 'Ukulele' : 'Kytara' }}
+            </span>
 
-        <!-- NADPIS & VOLBA NÁSTROJE -->
-        <h3 class="text-xl font-bold mb-1 text-[var(--text-main)]">
-          Ladička — {{ instrument() === 'UKU' ? 'Ukulele' : 'Kytara' }}
-        </h3>
-        <p class="text-xs text-[var(--text-muted)] mb-4">
-          {{ isListening() ? 'Poslouchám... Brnkni do struny' : 'Klikni na tlačítko a zapni mikrofon' }}
-        </p>
+            <!-- PŘEPÍNAČ AUTO / MANUÁL -->
+            <button
+              type="button"
+              (click)="toggleAutoMode()"
+              class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wide transition-all cursor-pointer border"
+              [class.bg-[var(--primary-color)]]="isAutoMode()"
+              [class.text-white]="isAutoMode()"
+              [class.border-[var(--primary-color)]]="isAutoMode()"
+              [class.bg-[var(--bg-input)]]="!isAutoMode()"
+              [class.text-[var(--text-muted)]]="!isAutoMode()"
+              [class.border-[var(--border-color)]]="!isAutoMode()"
+              title="Kliknutím přepnete na automatickou detekci"
+            >
+              {{ isAutoMode() ? 'AUTO' : 'MANUÁL' }}
+            </button>
+          </div>
 
-        <!-- UKAZATEL RUČIČKY (TUNER POINTER) -->
-        <div class="w-full bg-[var(--bg-body)] border border-[var(--border-color)] rounded-lg p-4 mb-6 relative flex flex-col items-center">
-          <div class="text-sm font-mono font-bold mb-2 h-6 text-center">
-            @if (detectedNote()) {
-              <span>Struna <strong class="text-[var(--primary-color)] text-lg">{{ detectedNote() }}</strong> ({{ detectedPitch().toFixed(1) }} Hz)</span>
+          <button
+            type="button"
+            class="h-7 w-7 flex items-center justify-center rounded-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer text-xs font-bold"
+            (click)="closeTuner()"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- MĚŘÍCÍ PLOCHA -->
+        <div class="relative bg-[var(--bg-input)] h-[380px] flex flex-col justify-between overflow-hidden border-b border-[var(--border-color)]">
+
+          <!-- VELKÝ DETEKOVANÝ TÓN -->
+          <div class="pt-3 z-10">
+            @if (isListening() && activeTargetString(); as target) {
+              <div class="text-4xl font-extrabold font-mono tracking-tight flex items-baseline justify-center" [class.text-emerald-500]="isTuned()" [class.text-[var(--text-main)]]="!isTuned()">
+                <span>{{ target.displayNote }}</span>
+                @if (target.subscript) {
+                  <span class="text-xl opacity-75 ml-0.5">{{ target.subscript }}</span>
+                }
+              </div>
+              <div
+                class="text-xs font-mono font-bold mt-0.5"
+                [class.text-emerald-500]="isTuned()"
+                [class.text-amber-500]="!isTuned()"
+              >
+                {{ tunerStatusText() }}
+              </div>
             } @else {
-              <span class="text-[var(--text-muted)] font-normal opacity-70">Čekám na tón...</span>
+              <div class="text-sm font-medium text-[var(--text-muted)] py-4 font-mono">
+                {{ isListening() ? (isAutoMode() ? 'Zahraj na strunu...' : 'Zahraj vybranou strunu...') : 'Ladička je vypnutá' }}
+              </div>
             }
           </div>
 
-          <!-- Stupnice -->
-          <div class="w-full h-3 bg-gray-300 dark:bg-gray-700 rounded-full relative overflow-hidden my-2">
-            <!-- Středová ryska -->
-            <div class="absolute left-1/2 top-0 bottom-0 w-1 bg-green-500 -translate-x-1/2 z-10"></div>
-            <!-- Ručička -->
-            <div
-              class="absolute top-0 bottom-0 w-3 rounded-full transition-all duration-75 -translate-x-1/2"
-              [style.left.%]="pointerPosition()"
-              [style.backgroundColor]="isTuned() ? '#22c55e' : '#f97316'"
-            ></div>
+          <!-- STUPNICE S ČÍSLY A ZÁŘEZY -->
+          <div class="relative w-full px-6 z-10">
+            <div class="flex justify-between text-[9px] font-mono text-[var(--text-muted)] mb-1 px-1 opacity-80">
+              <span>-50</span>
+              <span>-25</span>
+              <span class="text-emerald-500 font-bold">0</span>
+              <span>+25</span>
+              <span>+50</span>
+            </div>
+
+            <div class="relative w-full h-8 flex items-center">
+              <div class="absolute w-full h-[1px] bg-[var(--border-color)]"></div>
+
+              <div class="absolute inset-0 flex justify-between items-center pointer-events-none">
+                <div class="w-[1px] h-3 bg-[var(--border-color)]"></div>
+                <div class="w-[1px] h-2 bg-[var(--border-color)] opacity-60"></div>
+                <div class="w-[1px] h-3 bg-[var(--border-color)]"></div>
+                <div class="w-[1px] h-2 bg-[var(--border-color)] opacity-60"></div>
+                <div class="w-[2px] h-5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"></div>
+                <div class="w-[1px] h-2 bg-[var(--border-color)] opacity-60"></div>
+                <div class="w-[1px] h-3 bg-[var(--border-color)]"></div>
+                <div class="w-[1px] h-2 bg-[var(--border-color)] opacity-60"></div>
+                <div class="w-[1px] h-3 bg-[var(--border-color)]"></div>
+              </div>
+
+              <!-- POHYBLIVÝ KROUŽEK SE ŠIPKOU -->
+              <div
+                class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-75 ease-out flex flex-col items-center pointer-events-none"
+                [style.left.%]="isListening() ? pointerPosition() : 50"
+              >
+                <div
+                  class="w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-md transition-colors duration-150 bg-[var(--bg-card)]"
+                  [class.border-emerald-500]="isTuned()"
+                  [class.shadow-[0_0_12px_rgba(16,185,129,0.5)]]="isTuned()"
+                  [class.border-amber-500]="!isTuned() && isListening()"
+                  [class.border-[var(--border-color)]]="!isListening()"
+                >
+                  <div
+                    class="w-2.5 h-2.5 rounded-full"
+                    [class.bg-emerald-500]="isTuned()"
+                    [class.bg-amber-500]="!isTuned() && isListening()"
+                    [class.bg-[var(--text-muted)]]="!isListening()"
+                  ></div>
+                </div>
+
+                <div
+                  class="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] -mt-[1px]"
+                  [class.border-t-emerald-500]="isTuned()"
+                  [class.border-t-amber-500]="!isTuned() && isListening()"
+                  [class.border-t-[var(--border-color)]]="!isListening()"
+                ></div>
+              </div>
+            </div>
           </div>
 
-          <!-- Text stavu -->
-          <div class="text-xs font-semibold mt-1" [class.text-green-500]="isTuned()" [class.text-orange-500]="!isTuned() && detectedNote()">
-            {{ tunerStatusText() }}
-          </div>
-        </div>
+          <!-- SILUETA HLAVY KYTARY S NAVAZUJÍCÍM KRKEM -->
+          <div class="flex justify-center -mb-2">
+            <svg width="260" height="235" viewBox="0 0 260 235" class="overflow-visible">
 
-        <!-- HLAVA NÁSTROJE (SVG STROKE) -->
-        <div class="mb-6 flex justify-center">
-          <svg width="200" height="195" viewBox="0 0 200 195" class="text-[var(--text-main)]">
-            <!-- Silueta hlavy -->
-            <path d="M75,195 L75,160 L65,140 L65,25 Q100,5 135,25 L135,140 L125,160 L125,195 Z" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
-            <rect x="75" y="165" width="50" height="30" fill="currentColor" opacity="0.1" />
-
-            <!-- Kolíčky a struny -->
-            @for (strung of currentStrings(); track $index) {
-              <!-- Kolík -->
-              <circle
-                [attr.cx]="strung.align === 'end' ? 58 : 142"
-                [attr.cy]="strung.y"
-                r="4" fill="currentColor" opacity="0.3"
-              />
-              <line
-                [attr.x1]="strung.align === 'end' ? 58 : 142"
-                [attr.y1]="strung.y"
-                [attr.x2]="strung.align === 'end' ? 75 : 125"
-                [attr.y2]="strung.y"
-                stroke="currentColor" stroke-width="1" opacity="0.2"
+              <!-- Krk navazující pod nultým pražcem -->
+              <rect
+                x="98"
+                y="188"
+                width="64"
+                height="47"
+                fill="var(--border-color)"
+                opacity="0.18"
               />
 
-              <!-- Zvýrazněný kruh s tónem -->
-              <g class="cursor-pointer" (click)="playManualTone(strung.note)">
-                <circle
-                  [attr.cx]="strung.x"
-                  [attr.cy]="strung.y"
-                  r="15"
-                  [attr.fill]="detectedNote() === strung.note ? 'var(--primary-color)' : 'var(--bg-card)'"
-                  [attr.stroke]="detectedNote() === strung.note ? 'var(--primary-color)' : 'var(--border-color)'"
-                  stroke-width="2"
+              <!-- Obrys hlavy kytary a přechodu do krku -->
+              <path
+                d="M 98,235
+                   L 98,188
+                   L 84,152
+                   L 84,18
+                   Q 130,4 176,18
+                   L 176,152
+                   L 162,188
+                   L 162,235"
+                fill="none"
+                stroke="var(--border-color)"
+                stroke-width="2"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+              />
+
+              <!-- Kolíčky a tlačítka strun -->
+              @for (strung of currentStrings(); track strung.key) {
+                <!-- Vodicí linka -->
+                <line
+                  [attr.x1]="strung.pegX"
+                  [attr.y1]="strung.y"
+                  [attr.x2]="strung.headX"
+                  [attr.y2]="strung.y"
+                  stroke="var(--border-color)"
+                  stroke-width="1.8"
                 />
-                <text
-                  [attr.x]="strung.x"
-                  [attr.y]="strung.y + 4"
-                  text-anchor="middle"
-                  font-size="11"
-                  font-family="monospace"
-                  font-weight="bold"
-                  [attr.fill]="detectedNote() === strung.note ? '#ffffff' : 'var(--text-main)'"
-                >{{ strung.note }}</text>
-              </g>
-            }
-          </svg>
+
+                <!-- Malý kolíček na vnější straně -->
+                <circle
+                  [attr.cx]="strung.pegX"
+                  [attr.cy]="strung.y"
+                  r="4"
+                  fill="var(--border-color)"
+                />
+
+                <!-- Kruhové tlačítko s tónem -->
+                <g class="cursor-pointer group" (click)="selectManualString(strung)">
+                  <circle
+                    [attr.cx]="strung.btnX"
+                    [attr.cy]="strung.y"
+                    r="16"
+                    [attr.fill]="isSelectedOrDetected(strung) ? (isTuned() ? '#10b981' : '#f59e0b') : 'var(--bg-card)'"
+                    [attr.stroke]="isSelectedOrDetected(strung) ? (isTuned() ? '#10b981' : '#f59e0b') : 'var(--border-color)'"
+                    stroke-width="2"
+                    class="transition-colors duration-150 group-hover:stroke-[var(--primary-color)]"
+                  />
+                  <!-- Text tónu se spodním indexem -->
+                  <text
+                    [attr.x]="strung.subscript ? strung.btnX - 2.5 : strung.btnX"
+                    [attr.y]="strung.y + 4.5"
+                    text-anchor="middle"
+                    font-size="12"
+                    font-family="sans-serif"
+                    font-weight="bold"
+                    [attr.fill]="isSelectedOrDetected(strung) ? '#ffffff' : 'var(--text-main)'"
+                    class="transition-colors duration-150 group-hover:fill-[var(--primary-color)]"
+                  >{{ strung.displayNote }}</text>
+
+                  @if (strung.subscript) {
+                    <text
+                      [attr.x]="strung.btnX + 6"
+                      [attr.y]="strung.y + 6.5"
+                      text-anchor="middle"
+                      font-size="9"
+                      font-family="sans-serif"
+                      font-weight="bold"
+                      [attr.fill]="isSelectedOrDetected(strung) ? '#ffffff' : 'var(--text-muted)'"
+                    >{{ strung.subscript }}</text>
+                  }
+                </g>
+              }
+            </svg>
+          </div>
+
         </div>
 
-        <!-- OVLÁDACÍ TLAČÍTKO MIKROFONU -->
-        <button
-          type="button"
-          (click)="toggleListening()"
-          [class.bg-emerald-600]="!isListening()"
-          [class.hover:bg-emerald-700]="!isListening()"
-          [class.bg-rose-600]="isListening()"
-          [class.hover:bg-rose-700]="isListening()"
-          class="w-full py-2.5 rounded-lg text-white font-bold transition-colors shadow cursor-pointer text-sm"
-        >
-          {{ isListening() ? 'Zastavit ladičku' : 'Zapnout ladičku (mikrofon)' }}
-        </button>
+        <!-- TLAČÍTKO MIKROFONU -->
+        <div class="p-4 bg-[var(--bg-card)]">
+          <button
+            type="button"
+            (click)="toggleListening()"
+            class="w-full h-10 rounded-xl font-bold font-mono text-xs tracking-wider uppercase transition-all duration-150 cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 text-white"
+            [class.bg-rose-500]="isListening()"
+            [class.hover:bg-rose-600]="isListening()"
+            [class.bg-emerald-600]="!isListening()"
+            [class.hover:bg-emerald-700]="!isListening()"
+          >
+            @if (isListening()) {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+              </svg>
+              <span>Vypnout mikrofon</span>
+            } @else {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+              <span>Zapnout ladičku</span>
+            }
+          </button>
+        </div>
 
       </div>
     </div>
@@ -137,9 +283,13 @@ export class TunerComponent implements OnDestroy {
   close = output<void>();
 
   isListening = signal<boolean>(false);
+  isAutoMode = signal<boolean>(true);
+
   detectedPitch = signal<number>(0);
-  detectedNote = signal<string>('');
-  pointerPosition = signal<number>(50); // 50% = střed
+  activeKey = signal<string>('');
+  manualKey = signal<string | null>(null);
+
+  pointerPosition = signal<number>(50);
   isTuned = signal<boolean>(false);
   tunerStatusText = signal<string>('');
 
@@ -148,28 +298,59 @@ export class TunerComponent implements OnDestroy {
   private analyser: AnalyserNode | null = null;
   private animFrameId: number = 0;
 
-  guitarStrings = [
-    { note: "D", x: 30,  y: 65,  align: "end" },
-    { note: "A", x: 30,  y: 115, align: "end" },
-    { note: "E", x: 30,  y: 165, align: "end" },
-    { note: "G", x: 170, y: 65,  align: "start" },
-    { note: "B", x: 170, y: 115, align: "start" },
-    { note: "E", x: 170, y: 165, align: "start" }
+  guitarStrings: StringConfig[] = [
+    { key: "D3", displayNote: "D", y: 68,  btnX: 38,  pegX: 74,  headX: 84 },
+    { key: "A2", displayNote: "A", y: 126, btnX: 38,  pegX: 74,  headX: 84 },
+    { key: "E2", displayNote: "E", subscript: "2", y: 184, btnX: 38, pegX: 74, headX: 98 },
+    { key: "G3", displayNote: "G", y: 68,  btnX: 222, pegX: 186, headX: 176 },
+    { key: "B3", displayNote: "B", y: 126, btnX: 222, pegX: 186, headX: 176 },
+    { key: "E4", displayNote: "E", subscript: "4", y: 184, btnX: 222, pegX: 186, headX: 162 }
   ];
 
-  ukuleleStrings = [
-    { note: "G", x: 30,  y: 85,  align: "end" },
-    { note: "C", x: 30,  y: 145, align: "end" },
-    { note: "E", x: 170, y: 85,  align: "start" },
-    { note: "A", x: 170, y: 145, align: "start" }
+  ukuleleStrings: StringConfig[] = [
+    { key: "G4", displayNote: "G", y: 80,  btnX: 38,  pegX: 74,  headX: 84 },
+    { key: "C4", displayNote: "C", y: 155, btnX: 38,  pegX: 74,  headX: 98 },
+    { key: "E4_UKU", displayNote: "E", y: 80,  btnX: 222, pegX: 186, headX: 176 },
+    { key: "A4", displayNote: "A", y: 155, btnX: 222, pegX: 186, headX: 162 }
   ];
 
-  currentStrings = signal(this.guitarStrings);
+  currentStrings = signal<StringConfig[]>(this.guitarStrings);
+
+  activeTargetString = computed<StringConfig | null>(() => {
+    const key = !this.isAutoMode() ? this.manualKey() : this.activeKey();
+    if (!key) return null;
+    return this.currentStrings().find(s => s.key === key) || null;
+  });
 
   constructor() {
     effect(() => {
       this.currentStrings.set(this.instrument() === 'UKU' ? this.ukuleleStrings : this.guitarStrings);
+      this.manualKey.set(null);
+      this.isAutoMode.set(true);
     });
+  }
+
+  toggleAutoMode() {
+    this.isAutoMode.update(v => !v);
+    if (this.isAutoMode()) {
+      this.manualKey.set(null);
+    } else if (!this.manualKey()) {
+      this.manualKey.set(this.currentStrings()[0].key);
+    }
+  }
+
+  selectManualString(strung: StringConfig) {
+    this.isAutoMode.set(false);
+    this.manualKey.set(strung.key);
+    this.playManualTone(strung.key);
+  }
+
+  isSelectedOrDetected(strung: StringConfig): boolean {
+    if (!this.isListening()) return false;
+    if (!this.isAutoMode()) {
+      return this.manualKey() === strung.key;
+    }
+    return this.activeKey() === strung.key;
   }
 
   async toggleListening() {
@@ -194,7 +375,7 @@ export class TunerComponent implements OnDestroy {
       this.updateLoop();
     } catch (err) {
       console.error("Přístup k mikrofonu selhal:", err);
-      this.tunerStatusText.set("Povolte přístup k mikrofonu v prohlížeči.");
+      this.tunerStatusText.set("Povolte přístup k mikrofonu.");
     }
   }
 
@@ -212,13 +393,24 @@ export class TunerComponent implements OnDestroy {
     }
 
     this.pointerPosition.set(50);
-    this.detectedNote.set('');
+    this.activeKey.set('');
     this.tunerStatusText.set('');
+    this.isTuned.set(false);
   }
 
-  playManualTone(note: string) {
-    // Ruční přehrání referenčního tónu po kliknutí na kolík
-    const targetFreq = STRUNG_FREQUENCIES[note] || 220;
+  closeTuner() {
+    this.stopListening();
+    this.close.emit();
+  }
+
+  onBackdropClick(e: MouseEvent) {
+    if ((e.target as HTMLElement).classList.contains('fixed')) {
+      this.closeTuner();
+    }
+  }
+
+  playManualTone(key: string) {
+    const targetFreq = STRUNG_FREQUENCIES[key] || 220;
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -226,12 +418,12 @@ export class TunerComponent implements OnDestroy {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(targetFreq, ctx.currentTime);
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.5);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 1.5);
+    osc.stop(ctx.currentTime + 1.2);
   }
 
   private updateLoop = () => {
@@ -245,38 +437,39 @@ export class TunerComponent implements OnDestroy {
     if (pitch !== -1 && pitch > 50 && pitch < 500) {
       this.detectedPitch.set(pitch);
 
-      const isUku = this.instrument() === 'UKU';
-      const targetKeys = isUku
-        ? ["G4", "C4", "E4_UKU", "A4"]
-        : ["E2", "A2", "D3", "G3", "B3", "E4"];
+      let targetKey: string;
 
-      let closestKey = targetKeys[0];
-      let minDiff = Math.abs(pitch - STRUNG_FREQUENCIES[closestKey]);
+      if (this.isAutoMode()) {
+        const strings = this.currentStrings();
+        let closest = strings[0].key;
+        let minDiff = Math.abs(pitch - STRUNG_FREQUENCIES[closest]);
 
-      for (const k of targetKeys) {
-        const diff = Math.abs(pitch - STRUNG_FREQUENCIES[k]);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestKey = k;
+        for (const s of strings) {
+          const diff = Math.abs(pitch - STRUNG_FREQUENCIES[s.key]);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = s.key;
+          }
         }
+        targetKey = closest;
+        this.activeKey.set(targetKey);
+      } else {
+        targetKey = this.manualKey() || this.currentStrings()[0].key;
       }
 
-      const targetFreq = STRUNG_FREQUENCIES[closestKey];
-      const noteName = closestKey.replace(/[0-9_UKU]/g, '');
-      this.detectedNote.set(noteName);
-
+      const targetFreq = STRUNG_FREQUENCIES[targetKey];
       const diffHz = pitch - targetFreq;
 
       if (Math.abs(diffHz) < 1.0) {
         this.isTuned.set(true);
         this.pointerPosition.set(50);
-        this.tunerStatusText.set('Perfektně naladěno!');
+        this.tunerStatusText.set('Perfektní naladění ✓');
       } else {
         this.isTuned.set(false);
-        const direction = diffHz > 0 ? 'Povol strunu' : 'Utáhni strunu';
-        this.tunerStatusText.set(direction);
+        const cents = Math.round(diffHz * 4);
+        this.tunerStatusText.set(cents > 0 ? `+${cents} centů` : `${cents} centů`);
 
-        let pct = 50 + (diffHz * 4);
+        let pct = 50 + cents;
         pct = Math.max(5, Math.min(95, pct));
         this.pointerPosition.set(pct);
       }

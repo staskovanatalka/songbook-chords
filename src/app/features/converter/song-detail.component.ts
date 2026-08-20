@@ -16,7 +16,6 @@ import { ChordDiagramComponent } from '../../shared/components/chord-diagram.com
 import { StrummingPatternComponent } from '../../shared/components/strumming-pattern.component';
 import { Song } from '../../core/models/song.model';
 import { SongService } from '../../core/services/song.service';
-import { MetronomeService } from '../../core/services/metronome.service';
 import html2pdf from 'html2pdf.js';
 
 interface HoveredChord {
@@ -33,19 +32,19 @@ interface HoveredChord {
     @if (song(); as currentSong) {
       <div
         class="w-full relative overflow-visible toolbar-container"
+        [class.p-4]="songService.isFullscreen()"
+        [class.md:p-8]="songService.isFullscreen()"
         (mouseover)="onContentHover($event)"
-        (mouseleave)="onContentMouseLeave()"
+        (mouseout)="onContentMouseOut($event)"
       >
 
         <!-- HOVER TOOLTIP S DIAGRAMEM AKORDU -->
         @if (activeChord(); as chord) {
           <div
-            class="fixed z-[9999] pointer-events-auto transition-all duration-75"
+            class="fixed z-[99999] pointer-events-none transition-opacity duration-75"
             [style.left.px]="chord.x"
             [style.top.px]="chord.y - 8"
             style="transform: translate(-50%, -100%);"
-            (mouseenter)="onTooltipMouseEnter()"
-            (mouseleave)="onContentMouseLeave()"
           >
             <app-chord-diagram
               [chordName]="chord.name"
@@ -53,23 +52,33 @@ interface HoveredChord {
           </div>
         }
 
-        <!-- LOKÁLNÍ HUDEBNÍ LIŠTA -->
-        <div class="flex items-center justify-between mb-2 gap-2 px-1 flex-nowrap w-full min-w-0 overflow-visible">
+        <!-- PŘI FULLSCREENU: Tlačítko pro návrat v rohu -->
+        @if (songService.isFullscreen()) {
+          <button
+            type="button"
+            (click)="toggleFullscreen()"
+            class="fixed top-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer shadow-md text-xs font-mono select-none"
+            title="Ukončit režim celé obrazovky (Esc)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+            </svg>
+            <span>Esc</span>
+          </button>
+        }
 
-          <!-- LEVÁ ČÁST: PŘEPÍNÁ SE MEZI TRANSPOZICÍ A INLINE METRONOMEM -->
-          @if (!isMetronomeBarOpen()) {
+        <!-- BĚŽNÁ HUDEBNÍ LIŠTA (Při fullscreenu je skrytá) -->
+        @if (!songService.isFullscreen()) {
+          <div class="flex items-center justify-between mb-2 gap-2 px-1 flex-nowrap w-full min-w-0 overflow-visible">
 
-            <!-- 1. KONTROLER TRANSPOZICE -->
-            <div class="inline-flex rounded border border-[var(--primary-color)] font-mono text-xs shadow-sm shrink-0">
-
-              <!-- Tlačítko -1 -->
+            <!-- LEVÁ ČÁST: KONTROLER TRANSPOZICE -->
+            <div class="inline-flex rounded-lg border border-[var(--primary-color)] font-mono text-xs shadow-sm shrink-0 overflow-hidden">
               <button
                 type="button"
                 (click)="transpose(-1)"
-                class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer rounded-l shrink-0"
+                class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer shrink-0"
               >-1</button>
 
-              <!-- 12 TLAČÍTEK TÓNIN -->
               <div class="scale-picker-full items-center bg-[var(--bg-card)] shrink-0">
                 @for (note of scaleNotes(); track note; let i = $index) {
                   <button
@@ -83,213 +92,166 @@ interface HoveredChord {
                 }
               </div>
 
-              <!-- Kompaktní číselník transpozice -->
               <div class="scale-picker-compact items-center px-3 font-bold bg-[var(--bg-card)] text-[var(--primary-color)] border-l border-[var(--primary-color)] shrink-0">
                 {{ transposeOffset() > 0 ? '+' + transposeOffset() : transposeOffset() }}
               </div>
 
-              <!-- Tlačítko +1 -->
               <button
                 type="button"
                 (click)="transpose(1)"
-                class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer border-l border-[var(--primary-color)] rounded-r shrink-0"
+                class="px-2.5 py-1 bg-[var(--primary-color-alpha)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white font-medium transition-colors cursor-pointer border-l border-[var(--primary-color)] shrink-0"
               >+1</button>
             </div>
 
-          } @else {
+            <!-- PRAVÁ SKUPINA TLAČÍTEK -->
+            <div class="flex items-center gap-1.5 ml-auto font-mono shrink-0 relative">
 
-            <!-- 2. INLINE OVLÁDÁNÍ METRONOMU -->
-            <div class="inline-flex items-center gap-1.5 h-[31px]">
-
-              <div class="inline-flex items-center h-[31px] rounded border border-[var(--primary-color)] bg-[var(--bg-card)] font-mono text-xs overflow-hidden shadow-sm">
-                <button
-                  type="button"
-                  (click)="metronomeService.setBpm(-5)"
-                  class="h-full px-2 text-[var(--primary-color)] hover:bg-[var(--primary-color-alpha)] font-bold cursor-pointer"
-                  title="Zpomalit (-5 BPM)"
-                >–</button>
-
-                <div class="px-2.5 h-full flex items-center justify-center font-bold text-[var(--primary-color)] border-x border-[var(--primary-color)] bg-[var(--primary-color-alpha)] min-w-[70px]">
-                  {{ metronomeService.bpm() }} <span class="text-[10px] ml-1 opacity-75 font-normal">BPM</span>
-                </div>
-
-                <button
-                  type="button"
-                  (click)="metronomeService.setBpm(5)"
-                  class="h-full px-2 text-[var(--primary-color)] hover:bg-[var(--primary-color-alpha)] font-bold cursor-pointer"
-                  title="Zrychlit (+5 BPM)"
-                >+</button>
-              </div>
-
+              <!-- TLAČÍTKO FULLSCREEN -->
               <button
                 type="button"
-                (click)="metronomeService.toggle()"
-                [class.bg-emerald-600]="metronomeService.isPlaying()"
-                [class.bg-[var(--primary-color)]]="!metronomeService.isPlaying()"
-                class="h-[31px] px-3 rounded text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                (click)="toggleFullscreen()"
+                class="btn-icon"
+                title="Režim celé obrazovky"
               >
-                @if (metronomeService.isPlaying()) {
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16"/>
-                    <rect x="14" y="4" width="4" height="16"/>
-                  </svg>
-                  <span>STOP</span>
-                } @else {
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                  <span>START</span>
-                }
-              </button>
-
-            </div>
-
-          }
-
-          <!-- PRAVÁ SKUPINA TLAČÍTEK (Metronom, FIT | Sloupce, Písmo, 3 tečky) -->
-          <div class="flex items-center gap-1.5 ml-auto font-mono shrink-0 relative">
-
-            <!-- Tlačítko pro zapnutí / vypnutí metronomu -->
-            <button
-              type="button"
-              (click)="isMetronomeBarOpen.set(!isMetronomeBarOpen())"
-              [class.bg-[var(--primary-color-alpha)]]="isMetronomeBarOpen()"
-              [class.text-[var(--primary-color)]]="isMetronomeBarOpen()"
-              [class.border-[var(--primary-color)]]="isMetronomeBarOpen()"
-              class="h-[31px] w-8 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-              title="Metronom"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-            </button>
-
-            <!-- TLAČÍTKO FIT (před čarou) -->
-            <button
-              type="button"
-              (click)="toggleAutoFit()"
-              [class.bg-[var(--primary-color-alpha)]]="isAutoFitEnabled()"
-              [class.text-[var(--primary-color)]]="isAutoFitEnabled()"
-              [class.border-[var(--primary-color)]]="isAutoFitEnabled()"
-              class="h-[31px] px-2 flex items-center justify-center gap-1 rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors text-xs font-bold cursor-pointer"
-              title="Automaticky přizpůsobit velikost textu na obrazovku"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 14 10 14 10 20"></polyline>
-                <polyline points="20 10 14 10 14 4"></polyline>
-                <line x1="14" y1="10" x2="21" y2="3"></line>
-                <line x1="3" y1="21" x2="10" y2="14"></line>
-              </svg>
-              <span>Fit</span>
-            </button>
-
-            <!-- Jemný oddělovač -->
-            <div class="h-4 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
-
-            <!-- Tlačítko sloupce -->
-            <button
-              type="button"
-              (click)="toggleTwoColumns()"
-              [class.bg-[var(--primary-color-alpha)]]="isTwoColumns()"
-              [class.text-[var(--primary-color)]]="isTwoColumns()"
-              [class.border-[var(--primary-color)]]="isTwoColumns()"
-              class="h-[31px] px-2 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-              title="Přepnout sloupce"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                @if (isTwoColumns()) {
-                  <line x1="12" y1="3" x2="12" y2="21"></line>
-                }
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              (click)="changeFontSize(-1)"
-              class="h-[31px] px-2 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors text-xs font-medium cursor-pointer"
-            >A-</button>
-
-            <button
-              type="button"
-              (click)="changeFontSize(1)"
-              class="h-[31px] px-2 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors text-xs font-medium cursor-pointer"
-            >A+</button>
-
-            <!-- TLAČÍTKO SE TŘEMI TECKAMI & DROPDOWN -->
-            <div class="relative song-menu-container z-30">
-              <button
-                type="button"
-                (click)="toggleMenu($event)"
-                class="h-[31px] w-8 flex items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-                title="Další možnosti"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="pointer-events-none">
-                  <circle cx="12" cy="5" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="12" cy="19" r="2" />
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                 </svg>
               </button>
 
-              @if (isMenuOpen()) {
-                <div class="absolute right-0 top-full mt-1 w-44 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-2xl py-1 z-[9999] text-xs font-sans">
-                  <button
-                    type="button"
-                    (click)="onEdit()"
-                    class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--bg-hover)] text-[var(--text-main)] cursor-pointer"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    Upravit písničku
-                  </button>
+              <!-- TLAČÍTKO FIT -->
+              <button
+                type="button"
+                (click)="toggleAutoFit()"
+                class="btn-text"
+                [class.btn-active]="isAutoFitEnabled()"
+                title="Automaticky přizpůsobit velikost textu na obrazovku"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="4 14 10 14 10 20"></polyline>
+                  <polyline points="20 10 14 10 14 4"></polyline>
+                  <line x1="14" y1="10" x2="21" y2="3"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+                <span>Fit</span>
+              </button>
 
-                  <button
-                    type="button"
-                    (click)="onPrint()"
-                    class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--bg-hover)] text-[var(--text-main)] cursor-pointer"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                      <rect x="6" y="14" width="12" height="8"></rect>
-                    </svg>
-                    Tisk
-                  </button>
+              <div class="h-4 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
 
-                  <div class="my-1 border-t border-[var(--border-color)]"></div>
+              <!-- Tlačítko sloupce -->
+              <button
+                type="button"
+                (click)="toggleTwoColumns()"
+                class="btn-icon"
+                [class.btn-active]="isTwoColumns()"
+                title="Přepnout sloupce"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                  @if (isTwoColumns()) {
+                    <line x1="12" y1="3" x2="12" y2="21"></line>
+                  }
+                </svg>
+              </button>
 
-                  <button
-                    type="button"
-                    (click)="onDelete()"
-                    class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--bg-hover)] text-red-500 font-medium cursor-pointer"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                    Smazat písničku
-                  </button>
-                </div>
-              }
+              <button
+                type="button"
+                (click)="changeFontSize(-1)"
+                class="btn-text min-w-[34px]"
+                title="Zmenšit písmo"
+              >A-</button>
+
+              <button
+                type="button"
+                (click)="changeFontSize(1)"
+                class="btn-text min-w-[34px]"
+                title="Zvětšit písmo"
+              >A+</button>
+
+              <!-- TŘI TEČKY & DROPDOWN -->
+              <div class="relative song-menu-container z-30">
+                <button
+                  type="button"
+                  (click)="toggleMenu($event)"
+                  class="btn-icon"
+                  [class.btn-active]="isMenuOpen()"
+                  title="Další možnosti"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="pointer-events-none">
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="12" cy="19" r="2" />
+                  </svg>
+                </button>
+
+                @if (isMenuOpen()) {
+                  <div class="absolute right-0 top-full mt-1.5 w-44 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl py-1.5 z-[9999] text-xs font-sans">
+                    <button
+                      type="button"
+                      (click)="onEdit()"
+                      class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--bg-hover)] text-[var(--text-main)] cursor-pointer"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      Upravit písničku
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="onPrint()"
+                      class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--bg-hover)] text-[var(--text-main)] cursor-pointer"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                      </svg>
+                      Tisk
+                    </button>
+
+                    <div class="my-1 border-t border-[var(--border-color)]"></div>
+
+                    <button
+                      type="button"
+                      (click)="onDelete()"
+                      class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--bg-hover)] text-rose-500 font-medium cursor-pointer"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      Smazat písničku
+                    </button>
+                  </div>
+                }
+              </div>
+
             </div>
-
           </div>
-        </div>
+        }
 
-        <!-- KARTA PÍSNIČKY -->
+        <!-- SAMOTNÁ KARTA S PÍSNIČKOU -->
         <div
           #songCard
-          class="printable-song-card bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 mb-4 shadow-sm"
+          class="printable-song-card transition-all duration-150"
+          [class.bg-[var(--bg-card)]]="!songService.isFullscreen()"
+          [class.border]="!songService.isFullscreen()"
+          [class.border-[var(--border-color)]]="!songService.isFullscreen()"
+          [class.rounded-xl]="!songService.isFullscreen()"
+          [class.p-5]="!songService.isFullscreen()"
+          [class.mb-4]="!songService.isFullscreen()"
+          [class.shadow-sm]="!songService.isFullscreen()"
+          [class.p-0]="songService.isFullscreen()"
+          [class.border-0]="songService.isFullscreen()"
+          [class.bg-transparent]="songService.isFullscreen()"
         >
           <!-- HLAVIČKA -->
           <div class="flex justify-between items-center pb-2 mb-2 border-b border-[var(--border-color)] flex-wrap gap-2">
             <h2 class="text-xl md:text-2xl font-bold m-0 text-[var(--text-main)]">
               {{ currentSong.title }}
             </h2>
-            <div class="italic text-[var(--primary-color)] font-medium">
+            <div class="italic text-[var(--primary-color)] font-medium text-base md:text-lg">
               {{ currentSong.artist }}
             </div>
           </div>
@@ -371,11 +333,9 @@ interface HoveredChord {
 export class SongDetailComponent {
   sanitizer = inject(DomSanitizer);
   songService = inject(SongService);
-  metronomeService = inject(MetronomeService);
 
   songCardEl = viewChild<ElementRef>('songCard');
 
-  isMetronomeBarOpen = signal<boolean>(false);
   isAutoFitEnabled = signal<boolean>(true);
 
   song = input<Song | null>(null);
@@ -388,7 +348,6 @@ export class SongDetailComponent {
   isStrummingHovered = signal<boolean>(false);
 
   activeChord = signal<HoveredChord | null>(null);
-  private hideTimeout: any = null;
 
   scaleCZ = ["C", "C#", "D", "Es", "E", "F", "F#", "G", "As", "A", "B", "H"];
   scaleEN = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
@@ -470,6 +429,20 @@ export class SongDetailComponent {
     }
   }
 
+  @HostListener('window:keydown.escape')
+  onEscape() {
+    if (this.songService.isFullscreen()) {
+      this.toggleFullscreen();
+    }
+  }
+
+  toggleFullscreen() {
+    this.songService.toggleFullscreen();
+    setTimeout(() => {
+      this.calculateAutoFit();
+    }, 100);
+  }
+
   toggleAutoFit() {
     this.isAutoFitEnabled.update(v => !v);
     if (this.isAutoFitEnabled()) {
@@ -488,11 +461,10 @@ export class SongDetailComponent {
     const verses = currentSong.text.trim().split(/\n\s*\n/);
     const verseCount = verses.length;
 
-    // 2 sloupce aktivujeme při dostatečné šířce karty a min. 3 slokách
     const canFitTwoCols = cardWidth >= 650 && verseCount >= 3;
     this.isTwoColumns.set(canFitTwoCols);
 
-    let currentFont = canFitTwoCols ? 14 : 15;
+    let currentFont = canFitTwoCols ? 15 : 16;
     this.fontSize.set(currentFont);
 
     requestAnimationFrame(() => {
@@ -500,7 +472,7 @@ export class SongDetailComponent {
       const availableHeight = Math.max(windowHeight - cardRect.top - 20, 200);
 
       const adjust = () => {
-        if (cardEl.scrollHeight > availableHeight && currentFont > 9) {
+        if (cardEl.scrollHeight > availableHeight && currentFont > 10) {
           currentFont -= 0.5;
           this.fontSize.set(currentFont);
           requestAnimationFrame(adjust);
@@ -533,9 +505,8 @@ export class SongDetailComponent {
   }
 
   onContentHover(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    if (target && target.classList.contains('chord')) {
-      clearTimeout(this.hideTimeout);
+    const target = (event.target as HTMLElement)?.closest('.chord') as HTMLElement;
+    if (target) {
       const rect = target.getBoundingClientRect();
       const chordName = target.textContent?.trim() || '';
 
@@ -549,8 +520,11 @@ export class SongDetailComponent {
     }
   }
 
-  onTooltipMouseEnter() {
-    clearTimeout(this.hideTimeout);
+  onContentMouseOut(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (target && target.classList.contains('chord')) {
+      this.activeChord.set(null);
+    }
   }
 
   toggleMenu(event?: MouseEvent) {
@@ -607,12 +581,6 @@ export class SongDetailComponent {
   onDelete() {
     this.isMenuOpen.set(false);
     this.deleteSong.emit();
-  }
-
-  onContentMouseLeave() {
-    this.hideTimeout = setTimeout(() => {
-      this.activeChord.set(null);
-    }, 250);
   }
 
   private detectOriginalKeyIndex(text: string): number {

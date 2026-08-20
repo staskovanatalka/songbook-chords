@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* PŮVODNÍ PROMĚNNÉ */
+/* ========================================================= */
+/* 1. BAREVNÉ PROMĚNNÉ & ZÁKLAD                              */
+/* ========================================================= */
 :root {
   --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -39,22 +41,80 @@ body {
   font-family: var(--font-sans), sans-serif;
 }
 
+/* ========================================================= */
+/* 2. ZNOVUPOUŽITELNÉ KOMPONENTY (DESIGN SYSTEM)             */
+/* ========================================================= */
+@layer components {
 
+  /* Univerzální tlačítko (zaoblení rounded-lg shodné se sidebarem) */
+  .btn-base {
+    @apply h-[31px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]
+    text-[var(--text-muted)] font-mono text-xs font-medium
+    transition-all duration-150 cursor-pointer shadow-sm
+    hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]
+    disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Čtvercové tlačítko na ikonu (metronom, 2 sloupce, menu, ladička) */
+  .btn-icon {
+    @apply btn-base w-8 flex items-center justify-center p-0 shrink-0;
+  }
+
+  /* Tlačítko s textem (Fit, A-, A+) */
+  .btn-text {
+    @apply btn-base px-2.5 flex items-center justify-center gap-1.5 shrink-0;
+  }
+
+  /* Aktivní stav tlačítka */
+  .btn-active {
+    @apply bg-[var(--primary-color-alpha)] text-[var(--primary-color)] border-[var(--primary-color)] font-bold;
+  }
+
+  /* Hlavní plnobarevné tlačítko (např. Start metronomu) */
+  .btn-primary {
+    @apply h-[31px] px-3 rounded-lg bg-[var(--primary-color)] text-white font-mono text-xs font-bold
+    flex items-center justify-center gap-1.5 transition-all duration-150 cursor-pointer shadow-sm
+    hover:opacity-90 active:scale-[0.98];
+  }
+
+  /* Sjednocený vyhledávač / vstup */
+  .input-base {
+    @apply h-8 text-xs rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)]
+    text-[var(--text-main)] placeholder-[var(--text-muted)]
+    focus:outline-none focus:border-[var(--primary-color)] transition-all;
+  }
+
+  /* Zapuštěný segmentový přepínač záložek */
+  .segmented-control {
+    @apply flex p-0.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)];
+  }
+
+  .segmented-item {
+    @apply flex-1 text-[11px] font-medium rounded-md text-[var(--text-muted)]
+    transition-all cursor-pointer flex items-center justify-center;
+  }
+
+  .segmented-item-active {
+    @apply bg-[var(--bg-card)] text-[var(--primary-color)] font-bold shadow-sm;
+  }
+}
+
+/* ========================================================= */
+/* 3. HUDEBNÍ TYPOGRAFIE & AKORDY                            */
+/* ========================================================= */
 .symbol-above {
   font-family: var(--font-mono), monospace !important;
-  color: var(--text-main) !important; /* Klasická barva textu místo fialové */
-  font-weight: 400;                   /* Obyčejné nepříčné písmo */
-  font-size: inherit !important;     /* 1:1 velikost s běžným textem */
+  color: var(--text-main) !important;
+  font-weight: 400;
+  font-size: inherit !important;
   line-height: 1.2;
 }
 
-/* Textový řádek */
 .text-line {
   color: var(--text-main);
   margin-bottom: 0.1rem;
 }
 
-/* Samotný akord */
 .chord {
   font-family: var(--font-mono), monospace !important;
   font-weight: 700;
@@ -62,18 +122,12 @@ body {
   font-size: inherit !important;
 }
 
-/* ========================================================= */
-/* ÚPRAVA ZOBRAZENÍ TEXTU A DVOUSLOUPCOVÉHO ROZVRŽENÍ         */
-/* ========================================================= */
-
-/* Hlavní obal textu písně (nahrazuje původní pre#song-content) */
 #song-content {
   font-family: var(--font-mono), monospace !important;
   line-height: 1.4 !important;
   word-break: normal;
 }
 
-/* Sloka se NIKDY nerozdělí napůl mezi dva sloupce */
 .verse-block {
   break-inside: avoid-column !important;
   -webkit-column-break-inside: avoid !important;
@@ -81,7 +135,6 @@ body {
   display: block;
 }
 
-/* Pojistka pro slovo + akord nad ním: drží vždy pohromadě */
 .word-with-chord {
   position: relative;
   display: inline-flex;
@@ -89,19 +142,11 @@ body {
   vertical-align: bottom;
 }
 
-/* Obal pro zachování mezer a zamezení předčasného zalamování */
 .chord-word-wrapper {
   display: inline-block;
   white-space: pre;
 }
 
-/* OBSIDIAN STYLE SEZNAM PRO SIDEBAR */
-.sidebar-item-active {
-  background-color: var(--primary-color-alpha) !important;
-  color: var(--primary-color) !important;
-  font-weight: 600;
-}
-/* Zajištění, že každý verš leží na samostatném řádku a neslévá se s dalším */
 .line-wrapper {
   display: block;
   width: 100%;
@@ -109,21 +154,22 @@ body {
   word-break: normal;
 }
 
-/* CONTAINER QUERY PRO LIŠTU TRANSPOZICE */
+/* ========================================================= */
+/* 4. RESPONZIVNÍ TRANSPOZIČNÍ LIŠTA                         */
+/* ========================================================= */
 .toolbar-container {
   container-type: inline-size;
   container-name: toolbar;
 }
 
-/* Výchozí stav (málo místa / zapnutý metronom): Tóniny skryté, kompaktní číselník viditelný */
 .scale-picker-full {
   display: none !important;
 }
+
 .scale-picker-compact {
   display: flex !important;
 }
 
-/* Pokud má lišta volný prostor alespoň 680px, zobrazí se plná řada tónin */
 @container toolbar (min-width: 680px) {
   .scale-picker-full {
     display: flex !important;
@@ -134,7 +180,7 @@ body {
 }
 
 /* ========================================================= */
-/* CSS STYLY PRO TISK (@media print)                          */
+/* 5. TISK (@media print)                                    */
 /* ========================================================= */
 @media print {
   body * {
@@ -157,86 +203,4 @@ body {
     box-shadow: none !important;
     background: transparent !important;
   }
-
-  pre#song-content {
-    break-inside: avoid;
-    -webkit-column-break-inside: avoid;
-  }
-}
-
-/* ========================================================= */
-/* SJEDNOCENÍ BAREV PRVKŮ V HLAVNÍ LIŠTĚ                     */
-/* ========================================================= */
-header button,
-.song-toolbar button {
-  color: var(--text-muted) !important;
-}
-
-header button svg,
-.song-toolbar button svg {
-  stroke: currentColor;
-  color: var(--text-muted) !important;
-  opacity: 1 !important;
-}
-
-header button svg.text-emerald-500,
-header button svg.text-rose-500,
-header button .text-primary {
-  color: inherit;
-  stroke: inherit;
-}
-
-/* ========================================================= */
-/* SJEDNOCENÍ VELIKOSTÍ TLAČÍTEK V HORNÍ HLAVIČCE (32px)     */
-/* ========================================================= */
-header button {
-  height: 32px !important;
-  min-height: 32px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-sizing: border-box !important;
-}
-
-header button.icon-btn,
-header button:has(svg:only-child) {
-  width: 32px !important;
-  min-width: 32px !important;
-  padding: 0 !important;
-}
-
-header button:not(:has(svg:only-child)) {
-  padding-left: 10px !important;
-  padding-right: 10px !important;
-}
-
-/* ========================================================= */
-/* PRECIZNÍ SJEDNOCENÍ SPODNÍ HUDEBNÍ LIŠTY NA 28px          */
-/* ========================================================= */
-.song-toolbar button,
-.scale-picker-compact button,
-.scale-picker-full button {
-  height: 28px !important;
-  min-height: 28px !important;
-  max-height: 28px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  line-height: 28px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-sizing: border-box !important;
-}
-
-.song-toolbar button.icon-btn,
-.song-toolbar button:has(svg:only-child) {
-  width: 28px !important;
-  min-width: 28px !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-
-.song-toolbar button:not(:has(svg:only-child)) {
-  padding-left: 8px !important;
-  padding-right: 8px !important;
 }

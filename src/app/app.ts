@@ -7,7 +7,7 @@ import { SongConverterComponent, NewSongData } from './shared/components/song-co
 import { Song } from './core/models/song.model';
 import { TunerComponent } from './shared/components/tuner.component';
 import { AuthService } from './core/services/auth.service';
-import {SongDetailComponent} from './features/converter/song-detail.component';
+import { SongDetailComponent } from './features/converter/song-detail.component';
 
 @Component({
   selector: 'app-root',
@@ -23,13 +23,19 @@ import {SongDetailComponent} from './features/converter/song-detail.component';
   template: `
     @if (authService.currentUser()) {
       <!-- HLAVNÍ APLIKACE PRO PŘIHLÁŠENÉHO UŽIVATELE -->
-      <div class="h-screen w-screen flex flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-main)]">
+      <div
+        class="h-screen w-screen flex flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-main)] touch-pan-y"
+        (touchstart)="onTouchStart($event)"
+        (touchend)="onTouchEnd($event)"
+      >
 
-        <!-- HORNÍ LIŠTA -->
-        <app-header
-          (openConverter)="openNewSongConverter()"
-          (openTuner)="isTunerOpen.set(true)"
-        ></app-header>
+        <!-- HORNÍ LIŠTA (Skryje se při Fullscreenu) -->
+        @if (!songService.isFullscreen()) {
+          <app-header
+            (openConverter)="openNewSongConverter()"
+            (openTuner)="isTunerOpen.set(true)"
+          ></app-header>
+        }
 
         <!-- MODÁLNÍ OKNO LADIČKY -->
         @if (isTunerOpen()) {
@@ -42,12 +48,19 @@ import {SongDetailComponent} from './features/converter/song-detail.component';
         <!-- HLAVNÍ PLOCHA POD HLAVIČKOU -->
         <div class="flex flex-1 min-h-0 w-full overflow-hidden relative">
 
-          <!-- BOČNÍ PANEL SE SEZNAMEM -->
-          <app-sidebar></app-sidebar>
+          <!-- BOČNÍ PANEL SE SEZNAMEM (Skryje se při Fullscreenu) -->
+          @if (!songService.isFullscreen()) {
+            <app-sidebar></app-sidebar>
+          }
 
           <!-- HLAVNÍ OBSAH S PÍSNIČKOU NEBO PŘEVODNÍKEM -->
-          <main class="flex-1 overflow-y-auto p-4 md:p-6 min-w-0 transition-all duration-200">
-            <div class="max-w-6xl mx-auto">
+          <main
+            class="flex-1 overflow-y-auto min-w-0 transition-all duration-150"
+            [class.p-0]="songService.isFullscreen()"
+            [class.p-4]="!songService.isFullscreen()"
+            [class.md:p-6]="!songService.isFullscreen()"
+          >
+            <div [class.max-w-6xl]="!songService.isFullscreen()" [class.mx-auto]="!songService.isFullscreen()" class="w-full h-full">
               @switch (activeView()) {
                 @case ('detail') {
                   <app-song-detail
@@ -117,6 +130,9 @@ export class AppComponent {
   activeView = signal<'detail' | 'converter'>('detail');
   isTunerOpen = signal<boolean>(false);
 
+  private touchStartX = 0;
+  private touchStartY = 0;
+
   onEditSong() {
     const current = this.songService.activeSong();
     if (current) {
@@ -159,6 +175,62 @@ export class AppComponent {
     }
   }
 
+  onTouchStart(event: TouchEvent) {
+    this.touchStartX = event.changedTouches[0].screenX;
+    this.touchStartY = event.changedTouches[0].screenY;
+  }
+
+  onTouchEnd(event: TouchEvent) {
+    if (this.activeView() !== 'detail') return;
+
+    const touchEndX = event.changedTouches[0].screenX;
+    const touchEndY = event.changedTouches[0].screenY;
+
+    const diffX = touchEndX - this.touchStartX;
+    const diffY = touchEndY - this.touchStartY;
+
+    // Minimální délka gesta 50px a ověření, že šlo o horizontální tah
+    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+      if (diffX < 0) {
+        // Swipe doleva -> Další písnička
+        this.navigateNext();
+      } else {
+        // Swipe doprava -> Předchozí písnička
+        this.navigatePrev();
+      }
+    }
+  }
+
+  private navigateNext() {
+    const songs = this.songService.filteredSongs();
+    const current = this.songService.activeSong();
+    if (!songs.length) return;
+
+    if (!current) {
+      this.songService.selectSong(songs[0]);
+      return;
+    }
+
+    const currentIndex = songs.findIndex(s => s.id === current.id);
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % songs.length;
+    this.songService.selectSong(songs[nextIndex]);
+  }
+
+  private navigatePrev() {
+    const songs = this.songService.filteredSongs();
+    const current = this.songService.activeSong();
+    if (!songs.length) return;
+
+    if (!current) {
+      this.songService.selectSong(songs[0]);
+      return;
+    }
+
+    const currentIndex = songs.findIndex(s => s.id === current.id);
+    const prevIndex = currentIndex <= 0 ? songs.length - 1 : currentIndex - 1;
+    this.songService.selectSong(songs[prevIndex]);
+  }
+
   @HostListener('window:keydown', ['$event'])
   handleKeyboardNavigation(event: KeyboardEvent) {
     const activeElement = document.activeElement as HTMLElement;
@@ -174,31 +246,19 @@ export class AppComponent {
       return;
     }
 
-    if (this.activeView() !== 'detail') return;
-
-    const songs = this.songService.filteredSongs();
-    const current = this.songService.activeSong();
-
-    if (!songs.length) return;
-
-    if (!current) {
-      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) {
-        event.preventDefault();
-        this.songService.selectSong(songs[0]);
-      }
+    if (event.key === 'Escape' && this.songService.isFullscreen()) {
+      this.songService.toggleFullscreen();
       return;
     }
 
-    const currentIndex = songs.findIndex(s => s.id === current.id);
+    if (this.activeView() !== 'detail') return;
 
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault();
-      const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % songs.length;
-      this.songService.selectSong(songs[nextIndex]);
+      this.navigateNext();
     } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault();
-      let prevIndex = currentIndex <= 0 ? songs.length - 1 : currentIndex - 1;
-      this.songService.selectSong(songs[prevIndex]);
+      this.navigatePrev();
     }
   }
 }

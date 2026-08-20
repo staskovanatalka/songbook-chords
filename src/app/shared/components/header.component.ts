@@ -14,15 +14,15 @@ import { AuthService } from '../../core/services/auth.service';
     <header class="w-full px-4 border-b border-[var(--border-color)] py-2 bg-[var(--bg-card)]">
       <div class="flex justify-between items-center gap-2">
 
-        <!-- VLEVO: Tlačítka Sidebar a Přidat -->
-        <div class="flex items-center gap-2 shrink-0">
+        <!-- VLEVO: Navigace a správa obsahu -->
+        <div class="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            class="h-8 w-8 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+            class="btn-icon"
             title="Schovat/Zobrazit panel"
             (click)="songService.toggleSidebar()"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="3" ry="3"></rect>
               @if (songService.isSidebarCollapsed()) {
                 <line x1="7" y1="6.5" x2="7" y2="17.5"></line>
@@ -34,20 +34,75 @@ import { AuthService } from '../../core/services/auth.service';
 
           <button
             type="button"
-            class="h-8 w-8 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-            title="Přidat novou písničku"
+            class="btn-icon"
+            title="Přidat novou písničku do katalogu"
             (click)="openConverter.emit()"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
+        </div>
 
-          <!-- LADIČKA -->
+        <!-- VPRAVO: Pomůcky | Systémové prvky -->
+        <div class="flex items-center gap-1.5 shrink-0">
+
+          <!-- 1. METRONOM -->
+          <div class="flex items-center gap-1.5">
+            @if (isMetronomeBarOpen()) {
+              <div class="inline-flex items-center gap-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg p-0.5 h-[31px] font-mono text-xs shadow-xs animate-fade-in">
+                <button
+                  type="button"
+                  (click)="metronomeService.setBpm(-5)"
+                  class="h-6 w-6 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] font-bold cursor-pointer transition-colors"
+                  title="Zpomalit (-5 BPM)"
+                >–</button>
+
+                <div class="px-2 h-6 flex items-center justify-center font-bold text-[var(--primary-color)] text-xs min-w-[58px]">
+                  {{ metronomeService.bpm() }} <span class="text-[10px] ml-0.5 opacity-70 font-normal">BPM</span>
+                </div>
+
+                <button
+                  type="button"
+                  (click)="metronomeService.setBpm(5)"
+                  class="h-6 w-6 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] font-bold cursor-pointer transition-colors"
+                  title="Zrychlit (+5 BPM)"
+                >+</button>
+
+                <button
+                  type="button"
+                  (click)="metronomeService.toggle()"
+                  [class.bg-emerald-600]="metronomeService.isPlaying()"
+                  class="btn-primary h-6 px-2.5 text-[11px] ml-0.5"
+                >
+                  @if (metronomeService.isPlaying()) {
+                    <span>STOP</span>
+                  } @else {
+                    <span>START</span>
+                  }
+                </button>
+              </div>
+            }
+
+            <button
+              type="button"
+              (click)="isMetronomeBarOpen.set(!isMetronomeBarOpen())"
+              class="btn-icon"
+              [class.btn-active]="isMetronomeBarOpen() || metronomeService.isPlaying()"
+              title="Metronom"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </button>
+          </div>
+
+          <!-- 2. LADIČKA -->
           <button
             type="button"
-            class="h-8 px-2 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+            class="btn-icon"
             title="Otevřít ladičku"
             (click)="openTuner.emit()"
           >
@@ -55,56 +110,14 @@ import { AuthService } from '../../core/services/auth.service';
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
             </svg>
           </button>
-        </div>
 
-        <!-- VPRAVO: Nástroje, Téma a Profilové Menu -->
-        <div class="flex items-center gap-2 shrink-0">
+          <!-- Oddělovač -->
+          <div class="h-4 w-[1px] bg-[var(--border-color)] mx-1"></div>
 
-          <!-- Výběr barvy -->
-          <div class="relative flex items-center justify-center h-8 w-8">
-            <button
-              type="button"
-              class="h-full w-full flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors"
-              title="Změnit hlavní barvu"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 11.17 21.3 10.5 20.43 10.5H18.5C17.67 10.5 17 9.83 17 9V6.5C17 4.57 15.43 3 13.5 3H12C6.47715 3 2 7.47715 2 12C2 17.5228 6.47715 22 12 22Z"></path>
-                <circle cx="7.5" cy="10.5" r="1.5" fill="currentColor"></circle>
-                <circle cx="11.5" cy="7.5" r="1.5" fill="currentColor"></circle>
-                <circle cx="16.5" cy="9.5" r="1.5" fill="currentColor"></circle>
-                <circle cx="15.5" cy="14.5" r="1.5" fill="currentColor"></circle>
-              </svg>
-            </button>
-            <input
-              type="color"
-              [ngModel]="themeService.accentColor()"
-              (ngModelChange)="themeService.setAccentColor($event)"
-              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            >
-          </div>
-
-          <!-- Tlačítko Nástroj -->
+          <!-- 3. REŽIM (LIGHT / DARK) -->
           <button
             type="button"
-            (click)="songService.toggleInstrument()"
-            class="h-8 px-2.5 rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] text-xs font-mono font-medium hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-          >
-            {{ songService.currentInstrument() }}
-          </button>
-
-          <!-- Tlačítko Notace -->
-          <button
-            type="button"
-            (click)="songService.toggleNotation()"
-            class="h-8 px-2.5 rounded border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] text-xs font-mono font-medium hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-          >
-            {{ songService.currentNotation() }}
-          </button>
-
-          <!-- DARK / LIGHT REŽIM -->
-          <button
-            type="button"
-            class="h-8 px-2 flex items-center justify-center rounded border bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+            class="btn-icon"
             title="Přepnout tmavý/světlý režim"
             (click)="themeService.toggleTheme()"
           >
@@ -127,45 +140,36 @@ import { AuthService } from '../../core/services/auth.service';
             }
           </button>
 
-          <!-- PROFILOVÉ TLAČÍTKO S DROPDOWN MENU -->
-          @if (authService.currentUser(); as user) {
-            <div class="relative pl-2 border-l border-[var(--border-color)] flex items-center">
+          <!-- 4. NASTAVENÍ A PROFIL -->
+          <div class="relative flex items-center settings-container">
+            <button
+              type="button"
+              (click)="toggleMenu($event)"
+              class="btn-icon"
+              [class.btn-active]="isMenuOpen()"
+              title="Nastavení a účet"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
 
-              <!-- Kulaté tlačítko s fotkou -->
-              <button
-                type="button"
-                (click)="toggleUserMenu($event)"
-                class="w-8 h-8 rounded-full border border-[var(--border-color)] overflow-hidden flex items-center justify-center bg-[var(--bg-card)] hover:ring-2 hover:ring-[var(--primary-color)] transition-all cursor-pointer p-0 shrink-0 select-none"
-                title="{{ user.displayName || user.email }}"
-              >
-                @if (user.photoURL) {
-                  <img
-                    [src]="user.photoURL"
-                    [alt]="user.displayName || 'Profil'"
-                    referrerpolicy="no-referrer"
-                    class="w-8 h-8 min-w-[32px] min-h-[32px] max-w-[32px] max-h-[32px] object-cover rounded-full"
-                  />
-                } @else {
-                  <div class="w-full h-full bg-[var(--primary-color-alpha)] text-[var(--primary-color)] flex items-center justify-center text-xs font-bold font-mono">
-                    {{ user.displayName?.charAt(0) || user.email?.charAt(0) || 'U' }}
-                  </div>
-                }
-              </button>
+            <!-- DROPDOWN MENU -->
+            @if (isMenuOpen()) {
+              <div class="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl p-2 z-[100] font-sans">
 
-              <!-- Rozbalovací nabídka (Dropdown) -->
-              @if (isUserMenuOpen()) {
-                <div class="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl p-3 z-[100] font-sans">
-
-                  <!-- Hlavička uživatele -->
-                  <div class="flex items-center gap-3 pb-3 border-b border-[var(--border-color)]">
+                <!-- 1. PROFILOVKA, JMÉNO A E-MAIL V HORNÍ ČÁSTI -->
+                @if (authService.currentUser(); as user) {
+                  <div class="flex items-center gap-3 p-2 border-b border-[var(--border-color)] pb-2.5 mb-1.5">
                     @if (user.photoURL) {
                       <img
                         [src]="user.photoURL"
                         referrerpolicy="no-referrer"
-                        class="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full object-cover border border-[var(--border-color)] shrink-0"
+                        class="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-xl object-cover border border-[var(--border-color)] shrink-0"
                       />
                     } @else {
-                      <div class="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[var(--primary-color-alpha)] text-[var(--primary-color)] flex items-center justify-center text-sm font-bold font-mono shrink-0">
+                      <div class="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-[var(--primary-color-alpha)] text-[var(--primary-color)] flex items-center justify-center text-sm font-bold font-mono shrink-0">
                         {{ user.displayName?.charAt(0) || user.email?.charAt(0) || 'U' }}
                       </div>
                     }
@@ -179,31 +183,161 @@ import { AuthService } from '../../core/services/auth.service';
                       </p>
                     </div>
                   </div>
+                }
 
-                  <!-- Tlačítko odhlášení -->
-                  <div class="pt-2">
-                    <button
-                      type="button"
-                      (click)="handleLogout()"
-                      class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-xl text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                      </svg>
-                      <span>Odhlásit se</span>
-                    </button>
-                  </div>
+                <div class="space-y-1">
+                  <!-- 2. NASTAVENÍ -->
+                  <button
+                    type="button"
+                    (click)="openSettingsModal()"
+                    class="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--text-muted)]">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Nastavení</span>
+                  </button>
 
+                  <div class="my-1 border-t border-[var(--border-color)]"></div>
+
+                  <!-- 3. ODHLÁSIT SE -->
+                  <button
+                    type="button"
+                    (click)="handleLogout()"
+                    class="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                      <polyline points="16 17 21 12 16 7"></polyline>
+                      <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Odhlásit se</span>
+                  </button>
                 </div>
-              }
 
-            </div>
-          }
+              </div>
+            }
+          </div>
+
         </div>
       </div>
     </header>
+
+    <!-- MODAL NASTAVENÍ -->
+    @if (isSettingsOpen()) {
+      <div class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs font-sans">
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-sm shadow-2xl p-5 overflow-hidden">
+
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border-color)]">
+            <h3 class="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              Nastavení
+            </h3>
+            <button
+              type="button"
+              (click)="isSettingsOpen.set(false)"
+              class="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-colors cursor-pointer text-base"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <!-- NÁSTROJ -->
+            <div>
+              <label class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+                Nástroj pro akordy
+              </label>
+              <div class="segmented-control h-8">
+                <button
+                  type="button"
+                  (click)="songService.setInstrument('GTR')"
+                  class="segmented-item font-mono"
+                  [class.segmented-item-active]="songService.currentInstrument() === 'GTR'"
+                >
+                  🎸 Kytara (GTR)
+                </button>
+                <button
+                  type="button"
+                  (click)="songService.setInstrument('UKU')"
+                  class="segmented-item font-mono"
+                  [class.segmented-item-active]="songService.currentInstrument() === 'UKU'"
+                >
+                  🪕 Ukulele (UKU)
+                </button>
+              </div>
+            </div>
+
+            <!-- NOTACE -->
+            <div>
+              <label class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+                Systém notace akordů
+              </label>
+              <div class="segmented-control h-8">
+                <button
+                  type="button"
+                  (click)="songService.setNotation('CZ')"
+                  class="segmented-item font-mono"
+                  [class.segmented-item-active]="songService.currentNotation() === 'CZ'"
+                >
+                  Česká (H, B)
+                </button>
+                <button
+                  type="button"
+                  (click)="songService.setNotation('EN')"
+                  class="segmented-item font-mono"
+                  [class.segmented-item-active]="songService.currentNotation() === 'EN'"
+                >
+                  Anglická (B, Bb)
+                </button>
+              </div>
+            </div>
+
+            <!-- BARVA AKCENTU -->
+            <div>
+              <label class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+                Barva motivu
+              </label>
+              <div class="flex items-center justify-between p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)]">
+                <div class="flex items-center gap-2.5">
+                  <div
+                    class="w-6 h-6 rounded-lg border border-[var(--border-color)] shadow-xs"
+                    [style.backgroundColor]="themeService.accentColor()"
+                  ></div>
+                  <span class="text-xs font-mono font-medium text-[var(--text-main)]">
+                    {{ themeService.accentColor() }}
+                  </span>
+                </div>
+                <div class="relative">
+                  <button type="button" class="btn-text text-xs">Změnit barvu</button>
+                  <input
+                    type="color"
+                    [ngModel]="themeService.accentColor()"
+                    (ngModelChange)="themeService.setAccentColor($event)"
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 pt-3 border-t border-[var(--border-color)] flex justify-end">
+            <button
+              type="button"
+              (click)="isSettingsOpen.set(false)"
+              class="btn-primary w-full"
+            >
+              Hotovo
+            </button>
+          </div>
+
+        </div>
+      </div>
+    }
   `
 })
 export class HeaderComponent {
@@ -216,22 +350,31 @@ export class HeaderComponent {
   openConverter = output<void>();
   openTuner = output<void>();
 
-  isUserMenuOpen = signal<boolean>(false);
+  isMenuOpen = signal<boolean>(false);
+  isSettingsOpen = signal<boolean>(false);
+  isMetronomeBarOpen = signal<boolean>(false);
 
-  toggleUserMenu(event: MouseEvent) {
+  toggleMenu(event: MouseEvent) {
     event.stopPropagation();
-    this.isUserMenuOpen.update(v => !v);
+    this.isMetronomeBarOpen.set(false);
+    this.isMenuOpen.update(v => !v);
+  }
+
+  openSettingsModal() {
+    this.isMenuOpen.set(false);
+    this.isSettingsOpen.set(true);
   }
 
   handleLogout() {
-    this.isUserMenuOpen.set(false);
+    this.isMenuOpen.set(false);
     this.authService.logout();
   }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
     if (!this.elementRef.nativeElement.contains(event.target)) {
-      this.isUserMenuOpen.set(false);
+      this.isMenuOpen.set(false);
+      this.isMetronomeBarOpen.set(false);
     }
   }
 }
